@@ -49,8 +49,8 @@ class OSMBuildings {
    * @param {Number} [options.rotation=0] Initial rotation
    * @param {Number} [options.tilt=0] Initial tilt
    * @param {Object} [options.position] Initial position
-   * @param {Number} [options.position.latitude=52.520000] position latitude
-   * @param {Number} [options.position.longitude=13.410000] Position longitude
+   * @param {Number} [options.position.latitude=49.0] position latitude
+   * @param {Number} [options.position.longitude=8.4] Position longitude
    * @param {String} [options.baseURL='.'] DEPRECATED For locating assets. This is relative to calling html page
    * @param {Boolean} [options.showBackfaces=false] DEPRECATED Render front and backsides of polygons. false increases performance, true might be needed for bad geometries
    * @param {String} [options.fogColor='#e8e0d8'] Color to be used for sky gradients, distance fog and color benath the map
@@ -84,7 +84,7 @@ class OSMBuildings {
 
     this.bounds = options.bounds;
 
-    this.position = options.position || { latitude: 52.520000, longitude: 13.410000 };
+    this.position = options.position || { latitude: 49.0, longitude: 8.4 };
     this.zoom = options.zoom || (this.minZoom + (this.maxZoom - this.minZoom) / 2);
     this.rotation = options.rotation || 0;
     this.tilt = options.tilt || 0;
@@ -253,7 +253,7 @@ class OSMBuildings {
    * Adds an 3d object (OBJ format) file to the map.
    * <em>Important</em> objects with exactly the same url are cached and only loaded once.
    * @example
-   * osmb.addOBJ(`${location.protocol}//${location.hostname}/${location.pathname}/Fernsehturm.obj`, { latitude:52.52000, longitude:13.41000 }, { id:'Fernsehturm', scale:1, color:'#ff0000', altitude:0, rotation:51 });
+   * osmb.addOBJ(`${location.protocol}//${location.hostname}/${location.pathname}/Fernsehturm.obj`, { latitude:49.0, longitude:8.4 }, { id:'Fernsehturm', scale:1, color:'#ff0000', altitude:0, rotation:51 });
    *
    * @param {String} url Absolute URL to OBJ file
    * @param {Object} position Where to render the object

@@ -1,5 +1,181 @@
 (function(){
-var w3cColors = {
+
+/**
+ * @class
+ */
+class Qolor {
+
+  /**
+   * @constructor
+   * @param r {Number} 0.0 .. 1.0 red value of a color
+   * @param g {Number} 0.0 .. 1.0 green value of a color
+   * @param b {Number} 0.0 .. 1.0 blue value of a color
+   * @param a {Number} 0.0 .. 1.0 alpha value of a color, default 1
+   */
+  constructor (r, g, b, a = 1) {
+    this.r = this._clamp(r, 1);
+    this.g = this._clamp(g, 1);
+    this.b = this._clamp(b, 1);
+    this.a = this._clamp(a, 1);
+  }
+
+  /**
+   * @param str {String} can be any color dfinition like: 'red', '#0099ff', 'rgb(64, 128, 255)', 'rgba(64, 128, 255, 0.5)'
+   */
+  static parse (str) {
+    if (typeof str === 'string') {
+      str = str.toLowerCase();
+      str = Qolor.w3cColors[str] || str;
+
+      let m;
+
+      if ((m = str.match(/^#?(\w{2})(\w{2})(\w{2})$/))) {
+        return new Qolor(parseInt(m[1], 16)/255, parseInt(m[2], 16)/255, parseInt(m[3], 16)/255);
+      }
+
+      if ((m = str.match(/^#?(\w)(\w)(\w)$/))) {
+        return new Qolor(parseInt(m[1]+m[1], 16)/255, parseInt(m[2]+m[2], 16)/255, parseInt(m[3]+m[3], 16)/255);
+      }
+
+      if ((m = str.match(/rgba?\((\d+)\D+(\d+)\D+(\d+)(\D+([\d.]+))?\)/))) {
+        return new Qolor(
+          parseFloat(m[1])/255,
+          parseFloat(m[2])/255,
+          parseFloat(m[3])/255,
+          m[4] ? parseFloat(m[5]) : 1
+        );
+      }
+    }
+
+    return new Qolor();
+  }
+
+  static fromHSL (h, s, l, a) {
+    const qolor = new Qolor().fromHSL(h, s, l);
+    qolor.a = a === undefined ? 1 : a;
+    return qolor;
+  }
+
+  //***************************************************************************
+
+  _hue2rgb(p, q, t) {
+    if (t<0) t += 1;
+    if (t>1) t -= 1;
+    if (t<1/6) return p + (q - p)*6*t;
+    if (t<1/2) return q;
+    if (t<2/3) return p + (q - p)*(2/3 - t)*6;
+    return p;
+  }
+
+  _clamp(v, max) {
+    if (v === undefined) {
+      return;
+    }
+    return Math.min(max, Math.max(0, v || 0));
+  }
+
+  //***************************************************************************
+
+  isValid () {
+    return this.r !== undefined && this.g !== undefined && this.b !== undefined;
+  }
+
+  toHSL () {
+    if (!this.isValid()) {
+      return;
+    }
+
+    const max = Math.max(this.r, this.g, this.b);
+    const min = Math.min(this.r, this.g, this.b);
+    const range = max - min;
+    const l = (max + min)/2;
+
+    // achromatic
+    if (!range) {
+      return { h: 0, s: 0, l: l };
+    }
+
+    const s = l > 0.5 ? range/(2 - max - min) : range/(max + min);
+
+    let h;
+    switch (max) {
+      case this.r:
+        h = (this.g - this.b)/range + (this.g<this.b ? 6 : 0);
+        break;
+      case this.g:
+        h = (this.b - this.r)/range + 2;
+        break;
+      case this.b:
+        h = (this.r - this.g)/range + 4;
+        break;
+    }
+    h *= 60;
+
+    return { h: h, s: s, l: l };
+  }
+
+  fromHSL (h, s, l) {
+    // h = this._clamp(h, 360),
+    // s = this._clamp(s, 1),
+    // l = this._clamp(l, 1),
+
+    // achromatic
+    if (s === 0) {
+      this.r = this.g = this.b = l;
+      return this;
+    }
+
+    const q = l<0.5 ? l*(1 + s) : l + s - l*s;
+    const p = 2*l - q;
+
+    h /= 360;
+
+    this.r = this._hue2rgb(p, q, h + 1/3);
+    this.g = this._hue2rgb(p, q, h);
+    this.b = this._hue2rgb(p, q, h - 1/3);
+
+    return this;
+  }
+
+  toString () {
+    if (!this.isValid()) {
+      return;
+    }
+
+    if (this.a === 1) {
+      return '#' + ((1<<24) + (Math.round(this.r*255)<<16) + (Math.round(this.g*255)<<8) + Math.round(this.b*255)).toString(16).slice(1, 7);
+    }
+    return `rgba(${Math.round(this.r*255)},${Math.round(this.g*255)},${Math.round(this.b*255)},${this.a.toFixed(2)})`;
+  }
+
+  toArray () {
+    if (!this.isValid) {
+      return;
+    }
+    return [this.r, this.g, this.b];
+  }
+
+  hue (h) {
+    const hsl = this.toHSL();
+    return this.fromHSL(hsl.h+h, hsl.s, hsl.l);
+  }
+
+  saturation (s) {
+    const hsl = this.toHSL();
+    return this.fromHSL(hsl.h, hsl.s*s, hsl.l);
+  }
+
+  lightness (l) {
+    const hsl = this.toHSL();
+    return this.fromHSL(hsl.h, hsl.s, hsl.l*l);
+  }
+
+  clone () {
+    return new Qolor(this.r, this.g, this.b, this.a);
+  }
+}
+
+Qolor.w3cColors = {
   aliceblue: '#f0f8ff',
   antiquewhite: '#faebd7',
   aqua: '#00ffff',
@@ -150,173 +326,9 @@ var w3cColors = {
   yellowgreen: '#9acd32'
 };
 
-function hue2rgb(p, q, t) {
-  if (t<0) t += 1;
-  if (t>1) t -= 1;
-  if (t<1/6) return p + (q - p)*6*t;
-  if (t<1/2) return q;
-  if (t<2/3) return p + (q - p)*(2/3 - t)*6;
-  return p;
+if (typeof module !== 'undefined') {
+  module.exports = Qolor;
 }
-
-function clamp(v, max) {
-  if (v === undefined) {
-    return;
-  }
-  return Math.min(max, Math.max(0, v || 0));
-}
-
-//*****************************************************************************
-
-/**
- * @param str, object can be in any of these: 'red', '#0099ff', 'rgb(64, 128, 255)', 'rgba(64, 128, 255, 0.5)', { r:0.2, g:0.3, b:0.9, a:1 }
- */
-var Qolor = function(r, g, b, a) {
-  this.r = clamp(r, 1);
-  this.g = clamp(g, 1);
-  this.b = clamp(b, 1);
-  this.a = clamp(a, 1) || 1;
-};
-
-/**
- * @param str, object can be in any of these: 'red', '#0099ff', 'rgb(64, 128, 255)', 'rgba(64, 128, 255, 0.5)'
- */
-Qolor.parse = function(str) {
-  if (typeof str === 'string') {
-    str = str.toLowerCase();
-    str = w3cColors[str] || str;
-
-    var m;
-
-    if ((m = str.match(/^#?(\w{2})(\w{2})(\w{2})$/))) {
-      return new Qolor(parseInt(m[1], 16)/255, parseInt(m[2], 16)/255, parseInt(m[3], 16)/255);
-    }
-
-    if ((m = str.match(/^#?(\w)(\w)(\w)$/))) {
-      return new Qolor(parseInt(m[1]+m[1], 16)/255, parseInt(m[2]+m[2], 16)/255, parseInt(m[3]+m[3], 16)/255);
-    }
-
-    if ((m = str.match(/rgba?\((\d+)\D+(\d+)\D+(\d+)(\D+([\d.]+))?\)/))) {
-      return new Qolor(
-        parseFloat(m[1])/255,
-        parseFloat(m[2])/255,
-        parseFloat(m[3])/255,
-        m[4] ? parseFloat(m[5]) : 1
-      );
-    }
-  }
-
-  return new Qolor();
-};
-
-Qolor.fromHSL = function(h, s, l, a) {
-  var qolor = new Qolor().fromHSL(h, s, l);
-  qolor.a = a === undefined ? 1 : a;
-  return qolor;
-};
-
-//*****************************************************************************
-
-Qolor.prototype = {
-
-  isValid: function() {
-    return this.r !== undefined && this.g !== undefined && this.b !== undefined;
-  },
-
-  toHSL: function() {
-    if (!this.isValid()) {
-      return;
-    }
-
-    var
-      max = Math.max(this.r, this.g, this.b),
-      min = Math.min(this.r, this.g, this.b),
-      h, s, l = (max + min)/2,
-      d = max - min;
-
-    if (!d) {
-      h = s = 0; // achromatic
-    } else {
-      s = l>0.5 ? d/(2 - max - min) : d/(max + min);
-      switch (max) {
-        case this.r:
-          h = (this.g - this.b)/d + (this.g<this.b ? 6 : 0);
-          break;
-        case this.g:
-          h = (this.b - this.r)/d + 2;
-          break;
-        case this.b:
-          h = (this.r - this.g)/d + 4;
-          break;
-      }
-      h *= 60;
-    }
-
-    return { h: h, s: s, l: l };
-  },
-
-  fromHSL: function(h, s, l) {
-    // h = clamp(h, 360),
-    // s = clamp(s, 1),
-    // l = clamp(l, 1),
-
-    // achromatic
-    if (s === 0) {
-      this.r = this.g = this.b = l;
-      return this;
-    }
-
-    var
-      q = l<0.5 ? l*(1 + s) : l + s - l*s,
-      p = 2*l - q;
-
-    h /= 360;
-
-    this.r = hue2rgb(p, q, h + 1/3);
-    this.g = hue2rgb(p, q, h);
-    this.b = hue2rgb(p, q, h - 1/3);
-
-    return this;
-  },
-
-  toString: function() {
-    if (!this.isValid()) {
-      return;
-    }
-
-    if (this.a === 1) {
-      return '#' + ((1<<24) + (Math.round(this.r*255)<<16) + (Math.round(this.g*255)<<8) + Math.round(this.b*255)).toString(16).slice(1, 7);
-    }
-    return 'rgba(' + [Math.round(this.r*255), Math.round(this.g*255), Math.round(this.b*255), this.a.toFixed(2)].join(',') + ')';
-  },
-
-  toArray: function() {
-    if (!this.isValid) {
-      return;
-    }
-    
-    return [this.r, this.g, this.b];
-  },
-
-  hue: function(h) {
-    var hsl = this.toHSL();
-    return this.fromHSL(hsl.h+h, hsl.s, hsl.l);
-  },
-
-  saturation: function(s) {
-    var hsl = this.toHSL();
-    return this.fromHSL(hsl.h, hsl.s*s, hsl.l);
-  },
-
-  lightness: function(l) {
-    var hsl = this.toHSL();
-    return this.fromHSL(hsl.h, hsl.s, hsl.l*l);
-  },
-
-  clone: function() {
-    return new Qolor(this.r, this.g, this.b, this.a);
-  }
-};
 
 /*
  (c) 2011-2015, Vladimir Agafonkin
@@ -425,102 +437,24 @@ var suncalc = (function () {
 }());
 
 
-/******/ (function(modules) { // webpackBootstrap
-/******/ 	// The module cache
-/******/ 	var installedModules = {};
-/******/
-/******/ 	// The require function
-/******/ 	function __webpack_require__(moduleId) {
-/******/
-/******/ 		// Check if module is in cache
-/******/ 		if(installedModules[moduleId]) {
-/******/ 			return installedModules[moduleId].exports;
-/******/ 		}
-/******/ 		// Create a new module (and put it into the cache)
-/******/ 		var module = installedModules[moduleId] = {
-/******/ 			i: moduleId,
-/******/ 			l: false,
-/******/ 			exports: {}
-/******/ 		};
-/******/
-/******/ 		// Execute the module function
-/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-/******/
-/******/ 		// Flag the module as loaded
-/******/ 		module.l = true;
-/******/
-/******/ 		// Return the exports of the module
-/******/ 		return module.exports;
-/******/ 	}
-/******/
-/******/
-/******/ 	// expose the modules object (__webpack_modules__)
-/******/ 	__webpack_require__.m = modules;
-/******/
-/******/ 	// expose the module cache
-/******/ 	__webpack_require__.c = installedModules;
-/******/
-/******/ 	// define getter function for harmony exports
-/******/ 	__webpack_require__.d = function(exports, name, getter) {
-/******/ 		if(!__webpack_require__.o(exports, name)) {
-/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
-/******/ 		}
-/******/ 	};
-/******/
-/******/ 	// define __esModule on exports
-/******/ 	__webpack_require__.r = function(exports) {
-/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 		}
-/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 	};
-/******/
-/******/ 	// create a fake namespace object
-/******/ 	// mode & 1: value is a module id, require it
-/******/ 	// mode & 2: merge all properties of value into the ns
-/******/ 	// mode & 4: return value when already ns object
-/******/ 	// mode & 8|1: behave like require
-/******/ 	__webpack_require__.t = function(value, mode) {
-/******/ 		if(mode & 1) value = __webpack_require__(value);
-/******/ 		if(mode & 8) return value;
-/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
-/******/ 		var ns = Object.create(null);
-/******/ 		__webpack_require__.r(ns);
-/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
-/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
-/******/ 		return ns;
-/******/ 	};
-/******/
-/******/ 	// getDefaultExport function for compatibility with non-harmony modules
-/******/ 	__webpack_require__.n = function(module) {
-/******/ 		var getter = module && module.__esModule ?
-/******/ 			function getDefault() { return module['default']; } :
-/******/ 			function getModuleExports() { return module; };
-/******/ 		__webpack_require__.d(getter, 'a', getter);
-/******/ 		return getter;
-/******/ 	};
-/******/
-/******/ 	// Object.prototype.hasOwnProperty.call
-/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
-/******/
-/******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "";
-/******/
-/******/
-/******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = "./src/icons/triangulateSVG.js");
-/******/ })
-/************************************************************************/
-/******/ ({
+/*
+ * ATTENTION: The "eval" devtool has been used (maybe by default in mode: "development").
+ * This devtool is neither made for production nor for readable output files.
+ * It uses "eval()" calls to create a separate source file in the browser devtools.
+ * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
+ * or disable the default devtool with "devtool: false".
+ * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
+ */
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
 
 /***/ "./node_modules/abs-svg-path/index.js":
 /*!********************************************!*\
   !*** ./node_modules/abs-svg-path/index.js ***!
   \********************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ ((module) => {
 
-eval("\nmodule.exports = absolutize\n\n/**\n * redefine `path` with absolute coordinates\n *\n * @param {Array} path\n * @return {Array}\n */\n\nfunction absolutize(path){\n\tvar startX = 0\n\tvar startY = 0\n\tvar x = 0\n\tvar y = 0\n\n\treturn path.map(function(seg){\n\t\tseg = seg.slice()\n\t\tvar type = seg[0]\n\t\tvar command = type.toUpperCase()\n\n\t\t// is relative\n\t\tif (type != command) {\n\t\t\tseg[0] = command\n\t\t\tswitch (type) {\n\t\t\t\tcase 'a':\n\t\t\t\t\tseg[6] += x\n\t\t\t\t\tseg[7] += y\n\t\t\t\t\tbreak\n\t\t\t\tcase 'v':\n\t\t\t\t\tseg[1] += y\n\t\t\t\t\tbreak\n\t\t\t\tcase 'h':\n\t\t\t\t\tseg[1] += x\n\t\t\t\t\tbreak\n\t\t\t\tdefault:\n\t\t\t\t\tfor (var i = 1; i < seg.length;) {\n\t\t\t\t\t\tseg[i++] += x\n\t\t\t\t\t\tseg[i++] += y\n\t\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\t// update cursor state\n\t\tswitch (command) {\n\t\t\tcase 'Z':\n\t\t\t\tx = startX\n\t\t\t\ty = startY\n\t\t\t\tbreak\n\t\t\tcase 'H':\n\t\t\t\tx = seg[1]\n\t\t\t\tbreak\n\t\t\tcase 'V':\n\t\t\t\ty = seg[1]\n\t\t\t\tbreak\n\t\t\tcase 'M':\n\t\t\t\tx = startX = seg[1]\n\t\t\t\ty = startY = seg[2]\n\t\t\t\tbreak\n\t\t\tdefault:\n\t\t\t\tx = seg[seg.length - 2]\n\t\t\t\ty = seg[seg.length - 1]\n\t\t}\n\n\t\treturn seg\n\t})\n}\n\n\n//# sourceURL=webpack:///./node_modules/abs-svg-path/index.js?");
+eval("\nmodule.exports = absolutize\n\n/**\n * redefine `path` with absolute coordinates\n *\n * @param {Array} path\n * @return {Array}\n */\n\nfunction absolutize(path){\n\tvar startX = 0\n\tvar startY = 0\n\tvar x = 0\n\tvar y = 0\n\n\treturn path.map(function(seg){\n\t\tseg = seg.slice()\n\t\tvar type = seg[0]\n\t\tvar command = type.toUpperCase()\n\n\t\t// is relative\n\t\tif (type != command) {\n\t\t\tseg[0] = command\n\t\t\tswitch (type) {\n\t\t\t\tcase 'a':\n\t\t\t\t\tseg[6] += x\n\t\t\t\t\tseg[7] += y\n\t\t\t\t\tbreak\n\t\t\t\tcase 'v':\n\t\t\t\t\tseg[1] += y\n\t\t\t\t\tbreak\n\t\t\t\tcase 'h':\n\t\t\t\t\tseg[1] += x\n\t\t\t\t\tbreak\n\t\t\t\tdefault:\n\t\t\t\t\tfor (var i = 1; i < seg.length;) {\n\t\t\t\t\t\tseg[i++] += x\n\t\t\t\t\t\tseg[i++] += y\n\t\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\t// update cursor state\n\t\tswitch (command) {\n\t\t\tcase 'Z':\n\t\t\t\tx = startX\n\t\t\t\ty = startY\n\t\t\t\tbreak\n\t\t\tcase 'H':\n\t\t\t\tx = seg[1]\n\t\t\t\tbreak\n\t\t\tcase 'V':\n\t\t\t\ty = seg[1]\n\t\t\t\tbreak\n\t\t\tcase 'M':\n\t\t\t\tx = startX = seg[1]\n\t\t\t\ty = startY = seg[2]\n\t\t\t\tbreak\n\t\t\tdefault:\n\t\t\t\tx = seg[seg.length - 2]\n\t\t\t\ty = seg[seg.length - 1]\n\t\t}\n\n\t\treturn seg\n\t})\n}\n\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/abs-svg-path/index.js?");
 
 /***/ }),
 
@@ -528,10 +462,9 @@ eval("\nmodule.exports = absolutize\n\n/**\n * redefine `path` with absolute coo
 /*!********************************************************!*\
   !*** ./node_modules/adaptive-bezier-curve/function.js ***!
   \********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ ((module) => {
 
-eval("function clone(point) { //TODO: use gl-vec2 for this\n    return [point[0], point[1]]\n}\n\nfunction vec2(x, y) {\n    return [x, y]\n}\n\nmodule.exports = function createBezierBuilder(opt) {\n    opt = opt||{}\n\n    var RECURSION_LIMIT = typeof opt.recursion === 'number' ? opt.recursion : 8\n    var FLT_EPSILON = typeof opt.epsilon === 'number' ? opt.epsilon : 1.19209290e-7\n    var PATH_DISTANCE_EPSILON = typeof opt.pathEpsilon === 'number' ? opt.pathEpsilon : 1.0\n\n    var curve_angle_tolerance_epsilon = typeof opt.angleEpsilon === 'number' ? opt.angleEpsilon : 0.01\n    var m_angle_tolerance = opt.angleTolerance || 0\n    var m_cusp_limit = opt.cuspLimit || 0\n\n    return function bezierCurve(start, c1, c2, end, scale, points) {\n        if (!points)\n            points = []\n\n        scale = typeof scale === 'number' ? scale : 1.0\n        var distanceTolerance = PATH_DISTANCE_EPSILON / scale\n        distanceTolerance *= distanceTolerance\n        begin(start, c1, c2, end, points, distanceTolerance)\n        return points\n    }\n\n\n    ////// Based on:\n    ////// https://github.com/pelson/antigrain/blob/master/agg-2.4/src/agg_curves.cpp\n\n    function begin(start, c1, c2, end, points, distanceTolerance) {\n        points.push(clone(start))\n        var x1 = start[0],\n            y1 = start[1],\n            x2 = c1[0],\n            y2 = c1[1],\n            x3 = c2[0],\n            y3 = c2[1],\n            x4 = end[0],\n            y4 = end[1]\n        recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, 0)\n        points.push(clone(end))\n    }\n\n    function recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, level) {\n        if(level > RECURSION_LIMIT) \n            return\n\n        var pi = Math.PI\n\n        // Calculate all the mid-points of the line segments\n        //----------------------\n        var x12   = (x1 + x2) / 2\n        var y12   = (y1 + y2) / 2\n        var x23   = (x2 + x3) / 2\n        var y23   = (y2 + y3) / 2\n        var x34   = (x3 + x4) / 2\n        var y34   = (y3 + y4) / 2\n        var x123  = (x12 + x23) / 2\n        var y123  = (y12 + y23) / 2\n        var x234  = (x23 + x34) / 2\n        var y234  = (y23 + y34) / 2\n        var x1234 = (x123 + x234) / 2\n        var y1234 = (y123 + y234) / 2\n\n        if(level > 0) { // Enforce subdivision first time\n            // Try to approximate the full cubic curve by a single straight line\n            //------------------\n            var dx = x4-x1\n            var dy = y4-y1\n\n            var d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx)\n            var d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx)\n\n            var da1, da2\n\n            if(d2 > FLT_EPSILON && d3 > FLT_EPSILON) {\n                // Regular care\n                //-----------------\n                if((d2 + d3)*(d2 + d3) <= distanceTolerance * (dx*dx + dy*dy)) {\n                    // If the curvature doesn't exceed the distanceTolerance value\n                    // we tend to finish subdivisions.\n                    //----------------------\n                    if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n\n                    // Angle & Cusp Condition\n                    //----------------------\n                    var a23 = Math.atan2(y3 - y2, x3 - x2)\n                    da1 = Math.abs(a23 - Math.atan2(y2 - y1, x2 - x1))\n                    da2 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - a23)\n                    if(da1 >= pi) da1 = 2*pi - da1\n                    if(da2 >= pi) da2 = 2*pi - da2\n\n                    if(da1 + da2 < m_angle_tolerance) {\n                        // Finally we can stop the recursion\n                        //----------------------\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n\n                    if(m_cusp_limit !== 0.0) {\n                        if(da1 > m_cusp_limit) {\n                            points.push(vec2(x2, y2))\n                            return\n                        }\n\n                        if(da2 > m_cusp_limit) {\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n                    }\n                }\n            }\n            else {\n                if(d2 > FLT_EPSILON) {\n                    // p1,p3,p4 are collinear, p2 is considerable\n                    //----------------------\n                    if(d2 * d2 <= distanceTolerance * (dx*dx + dy*dy)) {\n                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                            points.push(vec2(x1234, y1234))\n                            return\n                        }\n\n                        // Angle Condition\n                        //----------------------\n                        da1 = Math.abs(Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1))\n                        if(da1 >= pi) da1 = 2*pi - da1\n\n                        if(da1 < m_angle_tolerance) {\n                            points.push(vec2(x2, y2))\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n\n                        if(m_cusp_limit !== 0.0) {\n                            if(da1 > m_cusp_limit) {\n                                points.push(vec2(x2, y2))\n                                return\n                            }\n                        }\n                    }\n                }\n                else if(d3 > FLT_EPSILON) {\n                    // p1,p2,p4 are collinear, p3 is considerable\n                    //----------------------\n                    if(d3 * d3 <= distanceTolerance * (dx*dx + dy*dy)) {\n                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                            points.push(vec2(x1234, y1234))\n                            return\n                        }\n\n                        // Angle Condition\n                        //----------------------\n                        da1 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - Math.atan2(y3 - y2, x3 - x2))\n                        if(da1 >= pi) da1 = 2*pi - da1\n\n                        if(da1 < m_angle_tolerance) {\n                            points.push(vec2(x2, y2))\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n\n                        if(m_cusp_limit !== 0.0) {\n                            if(da1 > m_cusp_limit)\n                            {\n                                points.push(vec2(x3, y3))\n                                return\n                            }\n                        }\n                    }\n                }\n                else {\n                    // Collinear case\n                    //-----------------\n                    dx = x1234 - (x1 + x4) / 2\n                    dy = y1234 - (y1 + y4) / 2\n                    if(dx*dx + dy*dy <= distanceTolerance) {\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n                }\n            }\n        }\n\n        // Continue subdivision\n        //----------------------\n        recursive(x1, y1, x12, y12, x123, y123, x1234, y1234, points, distanceTolerance, level + 1) \n        recursive(x1234, y1234, x234, y234, x34, y34, x4, y4, points, distanceTolerance, level + 1) \n    }\n}\n\n\n//# sourceURL=webpack:///./node_modules/adaptive-bezier-curve/function.js?");
+eval("function clone(point) { //TODO: use gl-vec2 for this\n    return [point[0], point[1]]\n}\n\nfunction vec2(x, y) {\n    return [x, y]\n}\n\nmodule.exports = function createBezierBuilder(opt) {\n    opt = opt||{}\n\n    var RECURSION_LIMIT = typeof opt.recursion === 'number' ? opt.recursion : 8\n    var FLT_EPSILON = typeof opt.epsilon === 'number' ? opt.epsilon : 1.19209290e-7\n    var PATH_DISTANCE_EPSILON = typeof opt.pathEpsilon === 'number' ? opt.pathEpsilon : 1.0\n\n    var curve_angle_tolerance_epsilon = typeof opt.angleEpsilon === 'number' ? opt.angleEpsilon : 0.01\n    var m_angle_tolerance = opt.angleTolerance || 0\n    var m_cusp_limit = opt.cuspLimit || 0\n\n    return function bezierCurve(start, c1, c2, end, scale, points) {\n        if (!points)\n            points = []\n\n        scale = typeof scale === 'number' ? scale : 1.0\n        var distanceTolerance = PATH_DISTANCE_EPSILON / scale\n        distanceTolerance *= distanceTolerance\n        begin(start, c1, c2, end, points, distanceTolerance)\n        return points\n    }\n\n\n    ////// Based on:\n    ////// https://github.com/pelson/antigrain/blob/master/agg-2.4/src/agg_curves.cpp\n\n    function begin(start, c1, c2, end, points, distanceTolerance) {\n        points.push(clone(start))\n        var x1 = start[0],\n            y1 = start[1],\n            x2 = c1[0],\n            y2 = c1[1],\n            x3 = c2[0],\n            y3 = c2[1],\n            x4 = end[0],\n            y4 = end[1]\n        recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, 0)\n        points.push(clone(end))\n    }\n\n    function recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, level) {\n        if(level > RECURSION_LIMIT) \n            return\n\n        var pi = Math.PI\n\n        // Calculate all the mid-points of the line segments\n        //----------------------\n        var x12   = (x1 + x2) / 2\n        var y12   = (y1 + y2) / 2\n        var x23   = (x2 + x3) / 2\n        var y23   = (y2 + y3) / 2\n        var x34   = (x3 + x4) / 2\n        var y34   = (y3 + y4) / 2\n        var x123  = (x12 + x23) / 2\n        var y123  = (y12 + y23) / 2\n        var x234  = (x23 + x34) / 2\n        var y234  = (y23 + y34) / 2\n        var x1234 = (x123 + x234) / 2\n        var y1234 = (y123 + y234) / 2\n\n        if(level > 0) { // Enforce subdivision first time\n            // Try to approximate the full cubic curve by a single straight line\n            //------------------\n            var dx = x4-x1\n            var dy = y4-y1\n\n            var d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx)\n            var d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx)\n\n            var da1, da2\n\n            if(d2 > FLT_EPSILON && d3 > FLT_EPSILON) {\n                // Regular care\n                //-----------------\n                if((d2 + d3)*(d2 + d3) <= distanceTolerance * (dx*dx + dy*dy)) {\n                    // If the curvature doesn't exceed the distanceTolerance value\n                    // we tend to finish subdivisions.\n                    //----------------------\n                    if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n\n                    // Angle & Cusp Condition\n                    //----------------------\n                    var a23 = Math.atan2(y3 - y2, x3 - x2)\n                    da1 = Math.abs(a23 - Math.atan2(y2 - y1, x2 - x1))\n                    da2 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - a23)\n                    if(da1 >= pi) da1 = 2*pi - da1\n                    if(da2 >= pi) da2 = 2*pi - da2\n\n                    if(da1 + da2 < m_angle_tolerance) {\n                        // Finally we can stop the recursion\n                        //----------------------\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n\n                    if(m_cusp_limit !== 0.0) {\n                        if(da1 > m_cusp_limit) {\n                            points.push(vec2(x2, y2))\n                            return\n                        }\n\n                        if(da2 > m_cusp_limit) {\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n                    }\n                }\n            }\n            else {\n                if(d2 > FLT_EPSILON) {\n                    // p1,p3,p4 are collinear, p2 is considerable\n                    //----------------------\n                    if(d2 * d2 <= distanceTolerance * (dx*dx + dy*dy)) {\n                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                            points.push(vec2(x1234, y1234))\n                            return\n                        }\n\n                        // Angle Condition\n                        //----------------------\n                        da1 = Math.abs(Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1))\n                        if(da1 >= pi) da1 = 2*pi - da1\n\n                        if(da1 < m_angle_tolerance) {\n                            points.push(vec2(x2, y2))\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n\n                        if(m_cusp_limit !== 0.0) {\n                            if(da1 > m_cusp_limit) {\n                                points.push(vec2(x2, y2))\n                                return\n                            }\n                        }\n                    }\n                }\n                else if(d3 > FLT_EPSILON) {\n                    // p1,p2,p4 are collinear, p3 is considerable\n                    //----------------------\n                    if(d3 * d3 <= distanceTolerance * (dx*dx + dy*dy)) {\n                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {\n                            points.push(vec2(x1234, y1234))\n                            return\n                        }\n\n                        // Angle Condition\n                        //----------------------\n                        da1 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - Math.atan2(y3 - y2, x3 - x2))\n                        if(da1 >= pi) da1 = 2*pi - da1\n\n                        if(da1 < m_angle_tolerance) {\n                            points.push(vec2(x2, y2))\n                            points.push(vec2(x3, y3))\n                            return\n                        }\n\n                        if(m_cusp_limit !== 0.0) {\n                            if(da1 > m_cusp_limit)\n                            {\n                                points.push(vec2(x3, y3))\n                                return\n                            }\n                        }\n                    }\n                }\n                else {\n                    // Collinear case\n                    //-----------------\n                    dx = x1234 - (x1 + x4) / 2\n                    dy = y1234 - (y1 + y4) / 2\n                    if(dx*dx + dy*dy <= distanceTolerance) {\n                        points.push(vec2(x1234, y1234))\n                        return\n                    }\n                }\n            }\n        }\n\n        // Continue subdivision\n        //----------------------\n        recursive(x1, y1, x12, y12, x123, y123, x1234, y1234, points, distanceTolerance, level + 1) \n        recursive(x1234, y1234, x234, y234, x34, y34, x4, y4, points, distanceTolerance, level + 1) \n    }\n}\n\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/adaptive-bezier-curve/function.js?");
 
 /***/ }),
 
@@ -539,10 +472,9 @@ eval("function clone(point) { //TODO: use gl-vec2 for this\n    return [point[0]
 /*!*****************************************************!*\
   !*** ./node_modules/adaptive-bezier-curve/index.js ***!
   \*****************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("module.exports = __webpack_require__(/*! ./function */ \"./node_modules/adaptive-bezier-curve/function.js\")()\n\n//# sourceURL=webpack:///./node_modules/adaptive-bezier-curve/index.js?");
+eval("module.exports = __webpack_require__(/*! ./function */ \"./node_modules/adaptive-bezier-curve/function.js\")()\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/adaptive-bezier-curve/index.js?");
 
 /***/ }),
 
@@ -550,10 +482,9 @@ eval("module.exports = __webpack_require__(/*! ./function */ \"./node_modules/ad
 /*!**************************************************!*\
   !*** ./node_modules/normalize-svg-path/index.js ***!
   \**************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ ((module) => {
 
-eval("\nvar PI = Math.PI\nvar _120 = radians(120)\n\nmodule.exports = normalize\n\n/**\n * describe `path` in terms of cubic bézier \n * curves and move commands\n *\n * @param {Array} path\n * @return {Array}\n */\n\nfunction normalize(path){\n\t// init state\n\tvar prev\n\tvar result = []\n\tvar bezierX = 0\n\tvar bezierY = 0\n\tvar startX = 0\n\tvar startY = 0\n\tvar quadX = null\n\tvar quadY = null\n\tvar x = 0\n\tvar y = 0\n\n\tfor (var i = 0, len = path.length; i < len; i++) {\n\t\tvar seg = path[i]\n\t\tvar command = seg[0]\n\t\tswitch (command) {\n\t\t\tcase 'M':\n\t\t\t\tstartX = seg[1]\n\t\t\t\tstartY = seg[2]\n\t\t\t\tbreak\n\t\t\tcase 'A':\n\t\t\t\tseg = arc(x, y,seg[1],seg[2],radians(seg[3]),seg[4],seg[5],seg[6],seg[7])\n\t\t\t\t// split multi part\n\t\t\t\tseg.unshift('C')\n\t\t\t\tif (seg.length > 7) {\n\t\t\t\t\tresult.push(seg.splice(0, 7))\n\t\t\t\t\tseg.unshift('C')\n\t\t\t\t}\n\t\t\t\tbreak\n\t\t\tcase 'S':\n\t\t\t\t// default control point\n\t\t\t\tvar cx = x\n\t\t\t\tvar cy = y\n\t\t\t\tif (prev == 'C' || prev == 'S') {\n\t\t\t\t\tcx += cx - bezierX // reflect the previous command's control\n\t\t\t\t\tcy += cy - bezierY // point relative to the current point\n\t\t\t\t}\n\t\t\t\tseg = ['C', cx, cy, seg[1], seg[2], seg[3], seg[4]]\n\t\t\t\tbreak\n\t\t\tcase 'T':\n\t\t\t\tif (prev == 'Q' || prev == 'T') {\n\t\t\t\t\tquadX = x * 2 - quadX // as with 'S' reflect previous control point\n\t\t\t\t\tquadY = y * 2 - quadY\n\t\t\t\t} else {\n\t\t\t\t\tquadX = x\n\t\t\t\t\tquadY = y\n\t\t\t\t}\n\t\t\t\tseg = quadratic(x, y, quadX, quadY, seg[1], seg[2])\n\t\t\t\tbreak\n\t\t\tcase 'Q':\n\t\t\t\tquadX = seg[1]\n\t\t\t\tquadY = seg[2]\n\t\t\t\tseg = quadratic(x, y, seg[1], seg[2], seg[3], seg[4])\n\t\t\t\tbreak\n\t\t\tcase 'L':\n\t\t\t\tseg = line(x, y, seg[1], seg[2])\n\t\t\t\tbreak\n\t\t\tcase 'H':\n\t\t\t\tseg = line(x, y, seg[1], y)\n\t\t\t\tbreak\n\t\t\tcase 'V':\n\t\t\t\tseg = line(x, y, x, seg[1])\n\t\t\t\tbreak\n\t\t\tcase 'Z':\n\t\t\t\tseg = line(x, y, startX, startY)\n\t\t\t\tbreak\n\t\t}\n\n\t\t// update state\n\t\tprev = command\n\t\tx = seg[seg.length - 2]\n\t\ty = seg[seg.length - 1]\n\t\tif (seg.length > 4) {\n\t\t\tbezierX = seg[seg.length - 4]\n\t\t\tbezierY = seg[seg.length - 3]\n\t\t} else {\n\t\t\tbezierX = x\n\t\t\tbezierY = y\n\t\t}\n\t\tresult.push(seg)\n\t}\n\n\treturn result\n}\n\nfunction line(x1, y1, x2, y2){\n\treturn ['C', x1, y1, x2, y2, x2, y2]\n}\n\nfunction quadratic(x1, y1, cx, cy, x2, y2){\n\treturn [\n\t\t'C',\n\t\tx1/3 + (2/3) * cx,\n\t\ty1/3 + (2/3) * cy,\n\t\tx2/3 + (2/3) * cx,\n\t\ty2/3 + (2/3) * cy,\n\t\tx2,\n\t\ty2\n\t]\n}\n\n// This function is ripped from \n// github.com/DmitryBaranovskiy/raphael/blob/4d97d4/raphael.js#L2216-L2304 \n// which references w3.org/TR/SVG11/implnote.html#ArcImplementationNotes\n// TODO: make it human readable\n\nfunction arc(x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2, recursive) {\n\tif (!recursive) {\n\t\tvar xy = rotate(x1, y1, -angle)\n\t\tx1 = xy.x\n\t\ty1 = xy.y\n\t\txy = rotate(x2, y2, -angle)\n\t\tx2 = xy.x\n\t\ty2 = xy.y\n\t\tvar x = (x1 - x2) / 2\n\t\tvar y = (y1 - y2) / 2\n\t\tvar h = (x * x) / (rx * rx) + (y * y) / (ry * ry)\n\t\tif (h > 1) {\n\t\t\th = Math.sqrt(h)\n\t\t\trx = h * rx\n\t\t\try = h * ry\n\t\t}\n\t\tvar rx2 = rx * rx\n\t\tvar ry2 = ry * ry\n\t\tvar k = (large_arc_flag == sweep_flag ? -1 : 1)\n\t\t\t* Math.sqrt(Math.abs((rx2 * ry2 - rx2 * y * y - ry2 * x * x) / (rx2 * y * y + ry2 * x * x)))\n\t\tif (k == Infinity) k = 1 // neutralize\n\t\tvar cx = k * rx * y / ry + (x1 + x2) / 2\n\t\tvar cy = k * -ry * x / rx + (y1 + y2) / 2\n\t\tvar f1 = Math.asin(((y1 - cy) / ry).toFixed(9))\n\t\tvar f2 = Math.asin(((y2 - cy) / ry).toFixed(9))\n\n\t\tf1 = x1 < cx ? PI - f1 : f1\n\t\tf2 = x2 < cx ? PI - f2 : f2\n\t\tif (f1 < 0) f1 = PI * 2 + f1\n\t\tif (f2 < 0) f2 = PI * 2 + f2\n\t\tif (sweep_flag && f1 > f2) f1 = f1 - PI * 2\n\t\tif (!sweep_flag && f2 > f1) f2 = f2 - PI * 2\n\t} else {\n\t\tf1 = recursive[0]\n\t\tf2 = recursive[1]\n\t\tcx = recursive[2]\n\t\tcy = recursive[3]\n\t}\n\t// greater than 120 degrees requires multiple segments\n\tif (Math.abs(f2 - f1) > _120) {\n\t\tvar f2old = f2\n\t\tvar x2old = x2\n\t\tvar y2old = y2\n\t\tf2 = f1 + _120 * (sweep_flag && f2 > f1 ? 1 : -1)\n\t\tx2 = cx + rx * Math.cos(f2)\n\t\ty2 = cy + ry * Math.sin(f2)\n\t\tvar res = arc(x2, y2, rx, ry, angle, 0, sweep_flag, x2old, y2old, [f2, f2old, cx, cy])\n\t}\n\tvar t = Math.tan((f2 - f1) / 4)\n\tvar hx = 4 / 3 * rx * t\n\tvar hy = 4 / 3 * ry * t\n\tvar curve = [\n\t\t2 * x1 - (x1 + hx * Math.sin(f1)),\n\t\t2 * y1 - (y1 - hy * Math.cos(f1)),\n\t\tx2 + hx * Math.sin(f2),\n\t\ty2 - hy * Math.cos(f2),\n\t\tx2,\n\t\ty2\n\t]\n\tif (recursive) return curve\n\tif (res) curve = curve.concat(res)\n\tfor (var i = 0; i < curve.length;) {\n\t\tvar rot = rotate(curve[i], curve[i+1], angle)\n\t\tcurve[i++] = rot.x\n\t\tcurve[i++] = rot.y\n\t}\n\treturn curve\n}\n\nfunction rotate(x, y, rad){\n\treturn {\n\t\tx: x * Math.cos(rad) - y * Math.sin(rad),\n\t\ty: x * Math.sin(rad) + y * Math.cos(rad)\n\t}\n}\n\nfunction radians(degress){\n\treturn degress * (PI / 180)\n}\n\n\n//# sourceURL=webpack:///./node_modules/normalize-svg-path/index.js?");
+eval("\nvar PI = Math.PI\nvar _120 = radians(120)\n\nmodule.exports = normalize\n\n/**\n * describe `path` in terms of cubic bézier \n * curves and move commands\n *\n * @param {Array} path\n * @return {Array}\n */\n\nfunction normalize(path){\n\t// init state\n\tvar prev\n\tvar result = []\n\tvar bezierX = 0\n\tvar bezierY = 0\n\tvar startX = 0\n\tvar startY = 0\n\tvar quadX = null\n\tvar quadY = null\n\tvar x = 0\n\tvar y = 0\n\n\tfor (var i = 0, len = path.length; i < len; i++) {\n\t\tvar seg = path[i]\n\t\tvar command = seg[0]\n\t\tswitch (command) {\n\t\t\tcase 'M':\n\t\t\t\tstartX = seg[1]\n\t\t\t\tstartY = seg[2]\n\t\t\t\tbreak\n\t\t\tcase 'A':\n\t\t\t\tseg = arc(x, y,seg[1],seg[2],radians(seg[3]),seg[4],seg[5],seg[6],seg[7])\n\t\t\t\t// split multi part\n\t\t\t\tseg.unshift('C')\n\t\t\t\tif (seg.length > 7) {\n\t\t\t\t\tresult.push(seg.splice(0, 7))\n\t\t\t\t\tseg.unshift('C')\n\t\t\t\t}\n\t\t\t\tbreak\n\t\t\tcase 'S':\n\t\t\t\t// default control point\n\t\t\t\tvar cx = x\n\t\t\t\tvar cy = y\n\t\t\t\tif (prev == 'C' || prev == 'S') {\n\t\t\t\t\tcx += cx - bezierX // reflect the previous command's control\n\t\t\t\t\tcy += cy - bezierY // point relative to the current point\n\t\t\t\t}\n\t\t\t\tseg = ['C', cx, cy, seg[1], seg[2], seg[3], seg[4]]\n\t\t\t\tbreak\n\t\t\tcase 'T':\n\t\t\t\tif (prev == 'Q' || prev == 'T') {\n\t\t\t\t\tquadX = x * 2 - quadX // as with 'S' reflect previous control point\n\t\t\t\t\tquadY = y * 2 - quadY\n\t\t\t\t} else {\n\t\t\t\t\tquadX = x\n\t\t\t\t\tquadY = y\n\t\t\t\t}\n\t\t\t\tseg = quadratic(x, y, quadX, quadY, seg[1], seg[2])\n\t\t\t\tbreak\n\t\t\tcase 'Q':\n\t\t\t\tquadX = seg[1]\n\t\t\t\tquadY = seg[2]\n\t\t\t\tseg = quadratic(x, y, seg[1], seg[2], seg[3], seg[4])\n\t\t\t\tbreak\n\t\t\tcase 'L':\n\t\t\t\tseg = line(x, y, seg[1], seg[2])\n\t\t\t\tbreak\n\t\t\tcase 'H':\n\t\t\t\tseg = line(x, y, seg[1], y)\n\t\t\t\tbreak\n\t\t\tcase 'V':\n\t\t\t\tseg = line(x, y, x, seg[1])\n\t\t\t\tbreak\n\t\t\tcase 'Z':\n\t\t\t\tseg = line(x, y, startX, startY)\n\t\t\t\tbreak\n\t\t}\n\n\t\t// update state\n\t\tprev = command\n\t\tx = seg[seg.length - 2]\n\t\ty = seg[seg.length - 1]\n\t\tif (seg.length > 4) {\n\t\t\tbezierX = seg[seg.length - 4]\n\t\t\tbezierY = seg[seg.length - 3]\n\t\t} else {\n\t\t\tbezierX = x\n\t\t\tbezierY = y\n\t\t}\n\t\tresult.push(seg)\n\t}\n\n\treturn result\n}\n\nfunction line(x1, y1, x2, y2){\n\treturn ['C', x1, y1, x2, y2, x2, y2]\n}\n\nfunction quadratic(x1, y1, cx, cy, x2, y2){\n\treturn [\n\t\t'C',\n\t\tx1/3 + (2/3) * cx,\n\t\ty1/3 + (2/3) * cy,\n\t\tx2/3 + (2/3) * cx,\n\t\ty2/3 + (2/3) * cy,\n\t\tx2,\n\t\ty2\n\t]\n}\n\n// This function is ripped from \n// github.com/DmitryBaranovskiy/raphael/blob/4d97d4/raphael.js#L2216-L2304 \n// which references w3.org/TR/SVG11/implnote.html#ArcImplementationNotes\n// TODO: make it human readable\n\nfunction arc(x1, y1, rx, ry, angle, large_arc_flag, sweep_flag, x2, y2, recursive) {\n\tif (!recursive) {\n\t\tvar xy = rotate(x1, y1, -angle)\n\t\tx1 = xy.x\n\t\ty1 = xy.y\n\t\txy = rotate(x2, y2, -angle)\n\t\tx2 = xy.x\n\t\ty2 = xy.y\n\t\tvar x = (x1 - x2) / 2\n\t\tvar y = (y1 - y2) / 2\n\t\tvar h = (x * x) / (rx * rx) + (y * y) / (ry * ry)\n\t\tif (h > 1) {\n\t\t\th = Math.sqrt(h)\n\t\t\trx = h * rx\n\t\t\try = h * ry\n\t\t}\n\t\tvar rx2 = rx * rx\n\t\tvar ry2 = ry * ry\n\t\tvar k = (large_arc_flag == sweep_flag ? -1 : 1)\n\t\t\t* Math.sqrt(Math.abs((rx2 * ry2 - rx2 * y * y - ry2 * x * x) / (rx2 * y * y + ry2 * x * x)))\n\t\tif (k == Infinity) k = 1 // neutralize\n\t\tvar cx = k * rx * y / ry + (x1 + x2) / 2\n\t\tvar cy = k * -ry * x / rx + (y1 + y2) / 2\n\t\tvar f1 = Math.asin(((y1 - cy) / ry).toFixed(9))\n\t\tvar f2 = Math.asin(((y2 - cy) / ry).toFixed(9))\n\n\t\tf1 = x1 < cx ? PI - f1 : f1\n\t\tf2 = x2 < cx ? PI - f2 : f2\n\t\tif (f1 < 0) f1 = PI * 2 + f1\n\t\tif (f2 < 0) f2 = PI * 2 + f2\n\t\tif (sweep_flag && f1 > f2) f1 = f1 - PI * 2\n\t\tif (!sweep_flag && f2 > f1) f2 = f2 - PI * 2\n\t} else {\n\t\tf1 = recursive[0]\n\t\tf2 = recursive[1]\n\t\tcx = recursive[2]\n\t\tcy = recursive[3]\n\t}\n\t// greater than 120 degrees requires multiple segments\n\tif (Math.abs(f2 - f1) > _120) {\n\t\tvar f2old = f2\n\t\tvar x2old = x2\n\t\tvar y2old = y2\n\t\tf2 = f1 + _120 * (sweep_flag && f2 > f1 ? 1 : -1)\n\t\tx2 = cx + rx * Math.cos(f2)\n\t\ty2 = cy + ry * Math.sin(f2)\n\t\tvar res = arc(x2, y2, rx, ry, angle, 0, sweep_flag, x2old, y2old, [f2, f2old, cx, cy])\n\t}\n\tvar t = Math.tan((f2 - f1) / 4)\n\tvar hx = 4 / 3 * rx * t\n\tvar hy = 4 / 3 * ry * t\n\tvar curve = [\n\t\t2 * x1 - (x1 + hx * Math.sin(f1)),\n\t\t2 * y1 - (y1 - hy * Math.cos(f1)),\n\t\tx2 + hx * Math.sin(f2),\n\t\ty2 - hy * Math.cos(f2),\n\t\tx2,\n\t\ty2\n\t]\n\tif (recursive) return curve\n\tif (res) curve = curve.concat(res)\n\tfor (var i = 0; i < curve.length;) {\n\t\tvar rot = rotate(curve[i], curve[i+1], angle)\n\t\tcurve[i++] = rot.x\n\t\tcurve[i++] = rot.y\n\t}\n\treturn curve\n}\n\nfunction rotate(x, y, rad){\n\treturn {\n\t\tx: x * Math.cos(rad) - y * Math.sin(rad),\n\t\ty: x * Math.sin(rad) + y * Math.cos(rad)\n\t}\n}\n\nfunction radians(degress){\n\treturn degress * (PI / 180)\n}\n\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/normalize-svg-path/index.js?");
 
 /***/ }),
 
@@ -561,10 +492,9 @@ eval("\nvar PI = Math.PI\nvar _120 = radians(120)\n\nmodule.exports = normalize\
 /*!**********************************************!*\
   !*** ./node_modules/parse-svg-path/index.js ***!
   \**********************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ ((module) => {
 
-eval("\nmodule.exports = parse\n\n/**\n * expected argument lengths\n * @type {Object}\n */\n\nvar length = {a: 7, c: 6, h: 1, l: 2, m: 2, q: 4, s: 4, t: 2, v: 1, z: 0}\n\n/**\n * segment pattern\n * @type {RegExp}\n */\n\nvar segment = /([astvzqmhlc])([^astvzqmhlc]*)/ig\n\n/**\n * parse an svg path data string. Generates an Array\n * of commands where each command is an Array of the\n * form `[command, arg1, arg2, ...]`\n *\n * @param {String} path\n * @return {Array}\n */\n\nfunction parse(path) {\n\tvar data = []\n\tpath.replace(segment, function(_, command, args){\n\t\tvar type = command.toLowerCase()\n\t\targs = parseValues(args)\n\n\t\t// overloaded moveTo\n\t\tif (type == 'm' && args.length > 2) {\n\t\t\tdata.push([command].concat(args.splice(0, 2)))\n\t\t\ttype = 'l'\n\t\t\tcommand = command == 'm' ? 'l' : 'L'\n\t\t}\n\n\t\twhile (true) {\n\t\t\tif (args.length == length[type]) {\n\t\t\t\targs.unshift(command)\n\t\t\t\treturn data.push(args)\n\t\t\t}\n\t\t\tif (args.length < length[type]) throw new Error('malformed path data')\n\t\t\tdata.push([command].concat(args.splice(0, length[type])))\n\t\t}\n\t})\n\treturn data\n}\n\nvar number = /-?[0-9]*\\.?[0-9]+(?:e[-+]?\\d+)?/ig\n\nfunction parseValues(args) {\n\tvar numbers = args.match(number)\n\treturn numbers ? numbers.map(Number) : []\n}\n\n\n//# sourceURL=webpack:///./node_modules/parse-svg-path/index.js?");
+eval("\nmodule.exports = parse\n\n/**\n * expected argument lengths\n * @type {Object}\n */\n\nvar length = {a: 7, c: 6, h: 1, l: 2, m: 2, q: 4, s: 4, t: 2, v: 1, z: 0}\n\n/**\n * segment pattern\n * @type {RegExp}\n */\n\nvar segment = /([astvzqmhlc])([^astvzqmhlc]*)/ig\n\n/**\n * parse an svg path data string. Generates an Array\n * of commands where each command is an Array of the\n * form `[command, arg1, arg2, ...]`\n *\n * @param {String} path\n * @return {Array}\n */\n\nfunction parse(path) {\n\tvar data = []\n\tpath.replace(segment, function(_, command, args){\n\t\tvar type = command.toLowerCase()\n\t\targs = parseValues(args)\n\n\t\t// overloaded moveTo\n\t\tif (type == 'm' && args.length > 2) {\n\t\t\tdata.push([command].concat(args.splice(0, 2)))\n\t\t\ttype = 'l'\n\t\t\tcommand = command == 'm' ? 'l' : 'L'\n\t\t}\n\n\t\twhile (true) {\n\t\t\tif (args.length == length[type]) {\n\t\t\t\targs.unshift(command)\n\t\t\t\treturn data.push(args)\n\t\t\t}\n\t\t\tif (args.length < length[type]) throw new Error('malformed path data')\n\t\t\tdata.push([command].concat(args.splice(0, length[type])))\n\t\t}\n\t})\n\treturn data\n}\n\nvar number = /-?[0-9]*\\.?[0-9]+(?:e[-+]?\\d+)?/ig\n\nfunction parseValues(args) {\n\tvar numbers = args.match(number)\n\treturn numbers ? numbers.map(Number) : []\n}\n\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/parse-svg-path/index.js?");
 
 /***/ }),
 
@@ -572,10 +502,9 @@ eval("\nmodule.exports = parse\n\n/**\n * expected argument lengths\n * @type {O
 /*!*************************************************!*\
   !*** ./node_modules/svg-path-contours/index.js ***!
   \*************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("var bezier = __webpack_require__(/*! adaptive-bezier-curve */ \"./node_modules/adaptive-bezier-curve/index.js\")\nvar abs = __webpack_require__(/*! abs-svg-path */ \"./node_modules/abs-svg-path/index.js\")\nvar norm = __webpack_require__(/*! normalize-svg-path */ \"./node_modules/normalize-svg-path/index.js\")\nvar copy = __webpack_require__(/*! vec2-copy */ \"./node_modules/vec2-copy/index.js\")\n\nfunction set(out, x, y) {\n    out[0] = x\n    out[1] = y\n    return out\n}\n\nvar tmp1 = [0,0],\n    tmp2 = [0,0],\n    tmp3 = [0,0]\n\nfunction bezierTo(points, scale, start, seg) {\n    bezier(start, \n        set(tmp1, seg[1], seg[2]), \n        set(tmp2, seg[3], seg[4]),\n        set(tmp3, seg[5], seg[6]), scale, points)\n}\n\nmodule.exports = function contours(svg, scale) {\n    var paths = []\n\n    var points = []\n    var pen = [0, 0]\n    norm(abs(svg)).forEach(function(segment, i, self) {\n        if (segment[0] === 'M') {\n            copy(pen, segment.slice(1))\n            if (points.length>0) {\n                paths.push(points)\n                points = []\n            }\n        } else if (segment[0] === 'C') {\n            bezierTo(points, scale, pen, segment)\n            set(pen, segment[5], segment[6])\n        } else {\n            throw new Error('illegal type in SVG: '+segment[0])\n        }\n    })\n    if (points.length>0)\n        paths.push(points)\n    return paths\n}\n\n//# sourceURL=webpack:///./node_modules/svg-path-contours/index.js?");
+eval("var bezier = __webpack_require__(/*! adaptive-bezier-curve */ \"./node_modules/adaptive-bezier-curve/index.js\")\nvar abs = __webpack_require__(/*! abs-svg-path */ \"./node_modules/abs-svg-path/index.js\")\nvar norm = __webpack_require__(/*! normalize-svg-path */ \"./node_modules/normalize-svg-path/index.js\")\nvar copy = __webpack_require__(/*! vec2-copy */ \"./node_modules/vec2-copy/index.js\")\n\nfunction set(out, x, y) {\n    out[0] = x\n    out[1] = y\n    return out\n}\n\nvar tmp1 = [0,0],\n    tmp2 = [0,0],\n    tmp3 = [0,0]\n\nfunction bezierTo(points, scale, start, seg) {\n    bezier(start, \n        set(tmp1, seg[1], seg[2]), \n        set(tmp2, seg[3], seg[4]),\n        set(tmp3, seg[5], seg[6]), scale, points)\n}\n\nmodule.exports = function contours(svg, scale) {\n    var paths = []\n\n    var points = []\n    var pen = [0, 0]\n    norm(abs(svg)).forEach(function(segment, i, self) {\n        if (segment[0] === 'M') {\n            copy(pen, segment.slice(1))\n            if (points.length>0) {\n                paths.push(points)\n                points = []\n            }\n        } else if (segment[0] === 'C') {\n            bezierTo(points, scale, pen, segment)\n            set(pen, segment[5], segment[6])\n        } else {\n            throw new Error('illegal type in SVG: '+segment[0])\n        }\n    })\n    if (points.length>0)\n        paths.push(points)\n    return paths\n}\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/svg-path-contours/index.js?");
 
 /***/ }),
 
@@ -583,10 +512,9 @@ eval("var bezier = __webpack_require__(/*! adaptive-bezier-curve */ \"./node_mod
 /*!*****************************************!*\
   !*** ./node_modules/vec2-copy/index.js ***!
   \*****************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ ((module) => {
 
-eval("module.exports = function vec2Copy(out, a) {\n    out[0] = a[0]\n    out[1] = a[1]\n    return out\n}\n\n//# sourceURL=webpack:///./node_modules/vec2-copy/index.js?");
+eval("module.exports = function vec2Copy(out, a) {\n    out[0] = a[0]\n    out[1] = a[1]\n    return out\n}\n\n//# sourceURL=webpack://OSMBuildings/./node_modules/vec2-copy/index.js?");
 
 /***/ }),
 
@@ -594,14 +522,47 @@ eval("module.exports = function vec2Copy(out, a) {\n    out[0] = a[0]\n    out[1
 /*!*************************************!*\
   !*** ./src/icons/triangulateSVG.js ***!
   \*************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("// webpack src/icons/triangulateSVG.js -o lib/triangulateSVG.js --mode development\n\nconst parseSVGPath = __webpack_require__(/*! parse-svg-path */ \"./node_modules/parse-svg-path/index.js\");\nconst getPathContours = __webpack_require__(/*! svg-path-contours */ \"./node_modules/svg-path-contours/index.js\");\n\n// TODO\n// rectangles, circles\n// colors from geometry\n// scale\n// simplify\n// ignore fill:none\n// <rect x=\"7.256\" y=\"17.315\" fill=\"none\" width=\"57.489\" height=\"35.508\"/>\n// <rect x=\"7.256\" y=\"49.216\" fill=\"#F07D00\" width=\"56.363\" height=\"3.607\"/>\n// <polygon fill=\"#003C64\" stroke=\"#003C64\" stroke-miterlimit=\"10\" points=\"18.465,18.011 12.628,29.15 12.628,18.011 7.256,18.011 7.256,42.903 12.628,42.903 12.628,29.867 18.789,42.903 24.84,42.903 17.75,29.365 24.195,18.011\"/>\n// <circle cx=\"25\" cy=\"75\" r=\"20\" stroke=\"red\" fill=\"transparent\" stroke-width=\"5\"/>\n// <ellipse cx=\"75\" cy=\"75\" rx=\"20\" ry=\"5\" stroke=\"red\" fill=\"transparent\" stroke-width=\"5\"/>\n\nfunction SVGtoPolygons (svg) {\n  const res = [];\n\n  let rx = /<path[^/]+d=\"([^\"]+)\"/g;\n  let match;\n  do {\n    match = rx.exec(svg);\n    if (match) {\n      const path = parseSVGPath(match[1]);\n      const contours = getPathContours(path);\n      res.push(contours);\n    }\n  } while (match);\n\n  rx = /<polygon[^/]+points=\"([^\"]+)\"/g;\n  do {\n    match = rx.exec(svg);\n    if (match) {\n      const points = match[1]\n        .split(/\\s+/g)\n        .map(point => {\n          const p = point.split(',');\n          return [\n            parseFloat(p[0]),\n            parseFloat(p[1]),\n          ];\n        });\n      res.push([points]);\n    }\n  } while (match);\n\n  return res;\n}\n\nfunction getOffsetAndScale (polygons) {\n  let\n    minX = Infinity, maxX = -Infinity,\n    minY = Infinity, maxY = -Infinity;\n\n  polygons.forEach(poly => {\n    poly.forEach(ring => {\n      ring.forEach(point => {\n        minX = Math.min(minX, point[0]);\n        maxX = Math.max(maxX, point[0]);\n        minY = Math.min(minY, point[1]);\n        maxY = Math.max(maxY, point[1]);\n      });\n    });\n  });\n\n  return { offset: [minX, minY], scale: Math.max(maxX-minX, maxY-minY) };\n}\n\nwindow.triangulateSVG = function (svg) { // window... exposes it in webpack\n  const polygons = SVGtoPolygons(svg);\n\n  const { offset, scale } = getOffsetAndScale(polygons);\n\n  const res = [];\n\n  polygons.forEach(poly => {\n    const\n      vertices = [],\n      ringIndex = [];\n\n    let r = 0;\n    poly.forEach((ring, i) => {\n      ring.forEach(point => {\n        vertices.push(...point);\n      });\n\n      if (i) {\n        r += poly[i - 1].length;\n        ringIndex.push(r);\n      }\n    });\n\n    const triangles = earcut(vertices, ringIndex);\n    for (let t = 0; t < triangles.length-2; t+=3) {\n      const i1 = triangles[t  ];\n      const i2 = triangles[t+1];\n      const i3 = triangles[t+2];\n\n      const a = [ (vertices[i1*2]-offset[0])/scale, (vertices[i1*2+1]-offset[1])/scale ];\n      const b = [ (vertices[i2*2]-offset[0])/scale, (vertices[i2*2+1]-offset[1])/scale ];\n      const c = [ (vertices[i3*2]-offset[0])/scale, (vertices[i3*2+1]-offset[1])/scale ];\n\n      res.push([a, b, c]);\n    }\n  });\n\n  return res;\n};\n\n\n//# sourceURL=webpack:///./src/icons/triangulateSVG.js?");
+eval("// webpack src/icons/triangulateSVG.js -o lib/triangulateSVG.js --mode development\n\nconst parseSVGPath = __webpack_require__(/*! parse-svg-path */ \"./node_modules/parse-svg-path/index.js\");\nconst getPathContours = __webpack_require__(/*! svg-path-contours */ \"./node_modules/svg-path-contours/index.js\");\n\n// TODO\n// rectangles, circles\n// colors from geometry\n// scale\n// simplify\n// ignore fill:none\n// <rect x=\"7.256\" y=\"17.315\" fill=\"none\" width=\"57.489\" height=\"35.508\"/>\n// <rect x=\"7.256\" y=\"49.216\" fill=\"#F07D00\" width=\"56.363\" height=\"3.607\"/>\n// <polygon fill=\"#003C64\" stroke=\"#003C64\" stroke-miterlimit=\"10\" points=\"18.465,18.011 12.628,29.15 12.628,18.011 7.256,18.011 7.256,42.903 12.628,42.903 12.628,29.867 18.789,42.903 24.84,42.903 17.75,29.365 24.195,18.011\"/>\n// <circle cx=\"25\" cy=\"75\" r=\"20\" stroke=\"red\" fill=\"transparent\" stroke-width=\"5\"/>\n// <ellipse cx=\"75\" cy=\"75\" rx=\"20\" ry=\"5\" stroke=\"red\" fill=\"transparent\" stroke-width=\"5\"/>\n\nfunction SVGtoPolygons (svg) {\n  const res = [];\n\n  let rx = /<path[^/]+d=\"([^\"]+)\"/g;\n  let match;\n  do {\n    match = rx.exec(svg);\n    if (match) {\n      const path = parseSVGPath(match[1]);\n      const contours = getPathContours(path);\n      res.push(contours);\n    }\n  } while (match);\n\n  rx = /<polygon[^/]+points=\"([^\"]+)\"/g;\n  do {\n    match = rx.exec(svg);\n    if (match) {\n      const points = match[1]\n        .split(/\\s+/g)\n        .map(point => {\n          const p = point.split(',');\n          return [\n            parseFloat(p[0]),\n            parseFloat(p[1]),\n          ];\n        });\n      res.push([points]);\n    }\n  } while (match);\n\n  return res;\n}\n\nfunction getOffsetAndScale (polygons) {\n  let\n    minX = Infinity, maxX = -Infinity,\n    minY = Infinity, maxY = -Infinity;\n\n  polygons.forEach(poly => {\n    poly.forEach(ring => {\n      ring.forEach(point => {\n        minX = Math.min(minX, point[0]);\n        maxX = Math.max(maxX, point[0]);\n        minY = Math.min(minY, point[1]);\n        maxY = Math.max(maxY, point[1]);\n      });\n    });\n  });\n\n  return { offset: [minX, minY], scale: Math.max(maxX-minX, maxY-minY) };\n}\n\nwindow.triangulateSVG = function (svg) { // window... exposes it in webpack\n  const polygons = SVGtoPolygons(svg);\n\n  const { offset, scale } = getOffsetAndScale(polygons);\n\n  const res = [];\n\n  polygons.forEach(poly => {\n    const\n      vertices = [],\n      ringIndex = [];\n\n    let r = 0;\n    poly.forEach((ring, i) => {\n      ring.forEach(point => {\n        vertices.push(...point);\n      });\n\n      if (i) {\n        r += poly[i - 1].length;\n        ringIndex.push(r);\n      }\n    });\n\n    const triangles = earcut(vertices, ringIndex);\n    for (let t = 0; t < triangles.length-2; t+=3) {\n      const i1 = triangles[t  ];\n      const i2 = triangles[t+1];\n      const i3 = triangles[t+2];\n\n      const a = [ (vertices[i1*2]-offset[0])/scale, (vertices[i1*2+1]-offset[1])/scale ];\n      const b = [ (vertices[i2*2]-offset[0])/scale, (vertices[i2*2+1]-offset[1])/scale ];\n      const c = [ (vertices[i3*2]-offset[0])/scale, (vertices[i3*2+1]-offset[1])/scale ];\n\n      res.push([a, b, c]);\n    }\n  });\n\n  return res;\n};\n\n\n//# sourceURL=webpack://OSMBuildings/./src/icons/triangulateSVG.js?");
 
 /***/ })
 
-/******/ });
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module can't be inlined because the eval devtool is used.
+/******/ 	var __webpack_exports__ = __webpack_require__("./src/icons/triangulateSVG.js");
+/******/ 	
+/******/ })()
+;
 
 var earcut = (function() {
 
@@ -1284,7 +1245,7 @@ shaders['blur'] = {"name":"blur","vs":"precision highp float; // is default in v
 
 const workers = {};
 
-workers['feature'] = 'class Request{static load(e,t){const r=new XMLHttpRequest,n=setTimeout(e=>{4!==r.readyState&&(r.abort(),t("status"))},1e4);return r.onreadystatechange=(()=>{4===r.readyState&&(clearTimeout(n),!r.status||r.status<200||r.status>299?t("status"):t(null,r))}),r.open("GET",e),r.send(null),{abort:()=>{r.abort()}}}static getText(e,t){return this.load(e,(e,r)=>{e?t(e):void 0!==r.responseText?t(null,r.responseText):t("content")})}static getXML(e,t){return this.load(e,(e,r)=>{e?t(e):void 0!==r.responseXML?t(null,r.responseXML):t("content")})}static getJSON(e,t){return this.load(e,(r,n)=>{if(r)return void t(r);if(!n.responseText)return void t("content");let o;try{o=JSON.parse(n.responseText),t(null,o)}catch(r){console.warn(`Could not parse JSON from ${e}\\n${r.message}`),t("content")}})}}var w3cColors={aliceblue:"#f0f8ff",antiquewhite:"#faebd7",aqua:"#00ffff",aquamarine:"#7fffd4",azure:"#f0ffff",beige:"#f5f5dc",bisque:"#ffe4c4",black:"#000000",blanchedalmond:"#ffebcd",blue:"#0000ff",blueviolet:"#8a2be2",brown:"#a52a2a",burlywood:"#deb887",cadetblue:"#5f9ea0",chartreuse:"#7fff00",chocolate:"#d2691e",coral:"#ff7f50",cornflowerblue:"#6495ed",cornsilk:"#fff8dc",crimson:"#dc143c",cyan:"#00ffff",darkblue:"#00008b",darkcyan:"#008b8b",darkgoldenrod:"#b8860b",darkgray:"#a9a9a9",darkgrey:"#a9a9a9",darkgreen:"#006400",darkkhaki:"#bdb76b",darkmagenta:"#8b008b",darkolivegreen:"#556b2f",darkorange:"#ff8c00",darkorchid:"#9932cc",darkred:"#8b0000",darksalmon:"#e9967a",darkseagreen:"#8fbc8f",darkslateblue:"#483d8b",darkslategray:"#2f4f4f",darkslategrey:"#2f4f4f",darkturquoise:"#00ced1",darkviolet:"#9400d3",deeppink:"#ff1493",deepskyblue:"#00bfff",dimgray:"#696969",dimgrey:"#696969",dodgerblue:"#1e90ff",firebrick:"#b22222",floralwhite:"#fffaf0",forestgreen:"#228b22",fuchsia:"#ff00ff",gainsboro:"#dcdcdc",ghostwhite:"#f8f8ff",gold:"#ffd700",goldenrod:"#daa520",gray:"#808080",grey:"#808080",green:"#008000",greenyellow:"#adff2f",honeydew:"#f0fff0",hotpink:"#ff69b4",indianred:"#cd5c5c",indigo:"#4b0082",ivory:"#fffff0",khaki:"#f0e68c",lavender:"#e6e6fa",lavenderblush:"#fff0f5",lawngreen:"#7cfc00",lemonchiffon:"#fffacd",lightblue:"#add8e6",lightcoral:"#f08080",lightcyan:"#e0ffff",lightgoldenrodyellow:"#fafad2",lightgray:"#d3d3d3",lightgrey:"#d3d3d3",lightgreen:"#90ee90",lightpink:"#ffb6c1",lightsalmon:"#ffa07a",lightseagreen:"#20b2aa",lightskyblue:"#87cefa",lightslategray:"#778899",lightslategrey:"#778899",lightsteelblue:"#b0c4de",lightyellow:"#ffffe0",lime:"#00ff00",limegreen:"#32cd32",linen:"#faf0e6",magenta:"#ff00ff",maroon:"#800000",mediumaquamarine:"#66cdaa",mediumblue:"#0000cd",mediumorchid:"#ba55d3",mediumpurple:"#9370db",mediumseagreen:"#3cb371",mediumslateblue:"#7b68ee",mediumspringgreen:"#00fa9a",mediumturquoise:"#48d1cc",mediumvioletred:"#c71585",midnightblue:"#191970",mintcream:"#f5fffa",mistyrose:"#ffe4e1",moccasin:"#ffe4b5",navajowhite:"#ffdead",navy:"#000080",oldlace:"#fdf5e6",olive:"#808000",olivedrab:"#6b8e23",orange:"#ffa500",orangered:"#ff4500",orchid:"#da70d6",palegoldenrod:"#eee8aa",palegreen:"#98fb98",paleturquoise:"#afeeee",palevioletred:"#db7093",papayawhip:"#ffefd5",peachpuff:"#ffdab9",peru:"#cd853f",pink:"#ffc0cb",plum:"#dda0dd",powderblue:"#b0e0e6",purple:"#800080",rebeccapurple:"#663399",red:"#ff0000",rosybrown:"#bc8f8f",royalblue:"#4169e1",saddlebrown:"#8b4513",salmon:"#fa8072",sandybrown:"#f4a460",seagreen:"#2e8b57",seashell:"#fff5ee",sienna:"#a0522d",silver:"#c0c0c0",skyblue:"#87ceeb",slateblue:"#6a5acd",slategray:"#708090",slategrey:"#708090",snow:"#fffafa",springgreen:"#00ff7f",steelblue:"#4682b4",tan:"#d2b48c",teal:"#008080",thistle:"#d8bfd8",tomato:"#ff6347",turquoise:"#40e0d0",violet:"#ee82ee",wheat:"#f5deb3",white:"#ffffff",whitesmoke:"#f5f5f5",yellow:"#ffff00",yellowgreen:"#9acd32"};function hue2rgb(e,t,r){return r<0&&(r+=1),r>1&&(r-=1),r<1/6?e+6*(t-e)*r:r<.5?t:r<2/3?e+(t-e)*(2/3-r)*6:e}function clamp(e,t){if(void 0!==e)return Math.min(t,Math.max(0,e||0))}var Qolor=function(e,t,r,n){this.r=clamp(e,1),this.g=clamp(t,1),this.b=clamp(r,1),this.a=clamp(n,1)||1};Qolor.parse=function(e){if("string"==typeof e){var t;if(e=e.toLowerCase(),t=(e=w3cColors[e]||e).match(/^#?(\\w{2})(\\w{2})(\\w{2})$/))return new Qolor(parseInt(t[1],16)/255,parseInt(t[2],16)/255,parseInt(t[3],16)/255);if(t=e.match(/^#?(\\w)(\\w)(\\w)$/))return new Qolor(parseInt(t[1]+t[1],16)/255,parseInt(t[2]+t[2],16)/255,parseInt(t[3]+t[3],16)/255);if(t=e.match(/rgba?\\((\\d+)\\D+(\\d+)\\D+(\\d+)(\\D+([\\d.]+))?\\)/))return new Qolor(parseFloat(t[1])/255,parseFloat(t[2])/255,parseFloat(t[3])/255,t[4]?parseFloat(t[5]):1)}return new Qolor},Qolor.fromHSL=function(e,t,r,n){var o=(new Qolor).fromHSL(e,t,r);return o.a=void 0===n?1:n,o},Qolor.prototype={isValid:function(){return void 0!==this.r&&void 0!==this.g&&void 0!==this.b},toHSL:function(){if(this.isValid()){var e,t,r=Math.max(this.r,this.g,this.b),n=Math.min(this.r,this.g,this.b),o=(r+n)/2,a=r-n;if(a){switch(t=o>.5?a/(2-r-n):a/(r+n),r){case this.r:e=(this.g-this.b)/a+(this.g<this.b?6:0);break;case this.g:e=(this.b-this.r)/a+2;break;case this.b:e=(this.r-this.g)/a+4}e*=60}else e=t=0;return{h:e,s:t,l:o}}},fromHSL:function(e,t,r){if(0===t)return this.r=this.g=this.b=r,this;var n=r<.5?r*(1+t):r+t-r*t,o=2*r-n;return e/=360,this.r=hue2rgb(o,n,e+1/3),this.g=hue2rgb(o,n,e),this.b=hue2rgb(o,n,e-1/3),this},toString:function(){if(this.isValid())return 1===this.a?"#"+((1<<24)+(Math.round(255*this.r)<<16)+(Math.round(255*this.g)<<8)+Math.round(255*this.b)).toString(16).slice(1,7):"rgba("+[Math.round(255*this.r),Math.round(255*this.g),Math.round(255*this.b),this.a.toFixed(2)].join(",")+")"},toArray:function(){if(this.isValid)return[this.r,this.g,this.b]},hue:function(e){var t=this.toHSL();return this.fromHSL(t.h+e,t.s,t.l)},saturation:function(e){var t=this.toHSL();return this.fromHSL(t.h,t.s*e,t.l)},lightness:function(e){var t=this.toHSL();return this.fromHSL(t.h,t.s,t.l*e)},clone:function(){return new Qolor(this.r,this.g,this.b,this.a)}};class OBJ{constructor(e,t,r){this.flipYZ=r,this.materialIndex={},this.vertexIndex=[],t&&this.readMTL(t),this.meshes=[],this.readOBJ(e)}readMTL(e){const t=e.split(/[\\r\\n]/g);let r,n=[];t.forEach(e=>{const t=e.trim().split(/\\s+/);switch(t[0]){case"newmtl":r&&(this.materialIndex[r]=n),r=t[1],n=[];break;case"Kd":n=[parseFloat(t[1]),parseFloat(t[2]),parseFloat(t[3])]}}),r&&(this.materialIndex[r]=n),e=null}readOBJ(e){let t,r,n=[];e.split(/[\\r\\n]/g).forEach(e=>{const o=e.trim().split(/\\s+/);switch(o[0]){case"g":case"o":this.storeMesh(t,r,n),t=o[1],n=[];break;case"usemtl":this.storeMesh(t,r,n),this.materialIndex[o[1]]&&(r=this.materialIndex[o[1]]),n=[];break;case"v":this.flipYZ?this.vertexIndex.push([parseFloat(o[1]),parseFloat(o[3]),parseFloat(o[2])]):this.vertexIndex.push([parseFloat(o[1]),parseFloat(o[2]),parseFloat(o[3])]);break;case"f":n.push([parseFloat(o[1])-1,parseFloat(o[2])-1,parseFloat(o[3])-1])}}),this.storeMesh(t,r,n)}storeMesh(e,t,r){if(r.length){const n=this.createGeometry(r);this.meshes.push({vertices:n.vertices,normals:n.normals,texCoords:n.texCoords,height:n.height,color:t,id:e})}}sub(e,t){return[e[0]-t[0],e[1]-t[1],e[2]-t[2]]}len(e){return Math.sqrt(e[0]*e[0]+e[1]*e[1]+e[2]*e[2])}unit(e){const t=this.len(e);return[e[0]/t,e[1]/t,e[2]/t]}normal(e,t,r){const n=this.sub(e,t),o=this.sub(t,r);return this.unit([n[1]*o[2]-n[2]*o[1],n[2]*o[0]-n[0]*o[2],n[0]*o[1]-n[1]*o[0]])}createGeometry(e){const t=[],r=[],n=[];let o=-1/0;return e.forEach(e=>{const a=this.vertexIndex[e[0]],i=this.vertexIndex[e[1]],s=this.vertexIndex[e[2]],l=this.normal(a,i,s);t.push(a[0],a[2],a[1],i[0],i[2],i[1],s[0],s[2],s[1]),r.push(l[0],l[1],l[2],l[0],l[1],l[2],l[0],l[1],l[2]),n.push(0,0,0,0,0,0),o=Math.max(o,a[1],i[1],s[1])}),{vertices:t,normals:r,texCoords:n,height:o}}}OBJ.parse=function(e,t,r){return new OBJ(e,t,r).meshes};var earcut=function(){function e(e,o,a){a=a||2;var i,s,c,h,d,p,g,x=o&&o.length,v=x?o[0]*a:e.length,m=t(e,0,v,a,!0),y=[];if(!m)return y;if(x&&(m=function(e,n,o,a){var i,s,c,h,d,p=[];for(i=0,s=n.length;i<s;i++)c=n[i]*a,h=i<s-1?n[i+1]*a:e.length,(d=t(e,c,h,a,!1))===d.next&&(d.steiner=!0),p.push(u(d));for(p.sort(l),i=0;i<p.length;i++)f(p[i],o),o=r(o,o.next);return o}(e,o,m,a)),e.length>80*a){i=c=e[0],s=h=e[1];for(var b=a;b<v;b+=a)(d=e[b])<i&&(i=d),(p=e[b+1])<s&&(s=p),d>c&&(c=d),p>h&&(h=p);g=Math.max(c-i,h-s)}return n(m,y,a,i,s,g),y}function t(e,t,r,n,o){var a,i;if(o===w(e,t,r,n)>0)for(a=t;a<r;a+=n)i=y(a,e[a],e[a+1],i);else for(a=r-n;a>=t;a-=n)i=y(a,e[a],e[a+1],i);return i&&g(i,i.next)&&(b(i),i=i.next),i}function r(e,t){if(!e)return e;t||(t=e);var r,n=e;do{if(r=!1,n.steiner||!g(n,n.next)&&0!==p(n.prev,n,n.next))n=n.next;else{if(b(n),(n=t=n.prev)===n.next)return null;r=!0}}while(r||n!==t);return t}function n(e,t,l,f,u,h,d){if(e){!d&&h&&function(e,t,r,n){var o=e;do{null===o.z&&(o.z=c(o.x,o.y,t,r,n)),o.prevZ=o.prev,o.nextZ=o.next,o=o.next}while(o!==e);o.prevZ.nextZ=null,o.prevZ=null,function(e){var t,r,n,o,a,i,s,l,f=1;do{for(r=e,e=null,a=null,i=0;r;){for(i++,n=r,s=0,t=0;t<f&&(s++,n=n.nextZ);t++);for(l=f;s>0||l>0&&n;)0===s?(o=n,n=n.nextZ,l--):0!==l&&n?r.z<=n.z?(o=r,r=r.nextZ,s--):(o=n,n=n.nextZ,l--):(o=r,r=r.nextZ,s--),a?a.nextZ=o:e=o,o.prevZ=a,a=o;r=n}a.nextZ=null,f*=2}while(i>1)}(o)}(e,f,u,h);for(var p,g,x=e;e.prev!==e.next;)if(p=e.prev,g=e.next,h?a(e,f,u,h):o(e))t.push(p.i/l),t.push(e.i/l),t.push(g.i/l),b(e),e=g.next,x=g.next;else if((e=g)===x){d?1===d?n(e=i(e,t,l),t,l,f,u,h,2):2===d&&s(e,t,l,f,u,h):n(r(e),t,l,f,u,h,1);break}}}function o(e){var t=e.prev,r=e,n=e.next;if(p(t,r,n)>=0)return!1;for(var o=e.next.next;o!==e.prev;){if(h(t.x,t.y,r.x,r.y,n.x,n.y,o.x,o.y)&&p(o.prev,o,o.next)>=0)return!1;o=o.next}return!0}function a(e,t,r,n){var o=e.prev,a=e,i=e.next;if(p(o,a,i)>=0)return!1;for(var s=o.x<a.x?o.x<i.x?o.x:i.x:a.x<i.x?a.x:i.x,l=o.y<a.y?o.y<i.y?o.y:i.y:a.y<i.y?a.y:i.y,f=o.x>a.x?o.x>i.x?o.x:i.x:a.x>i.x?a.x:i.x,u=o.y>a.y?o.y>i.y?o.y:i.y:a.y>i.y?a.y:i.y,d=c(s,l,t,r,n),g=c(f,u,t,r,n),x=e.nextZ;x&&x.z<=g;){if(x!==e.prev&&x!==e.next&&h(o.x,o.y,a.x,a.y,i.x,i.y,x.x,x.y)&&p(x.prev,x,x.next)>=0)return!1;x=x.nextZ}for(x=e.prevZ;x&&x.z>=d;){if(x!==e.prev&&x!==e.next&&h(o.x,o.y,a.x,a.y,i.x,i.y,x.x,x.y)&&p(x.prev,x,x.next)>=0)return!1;x=x.prevZ}return!0}function i(e,t,r){var n=e;do{var o=n.prev,a=n.next.next;!g(o,a)&&x(o,n,n.next,a)&&v(o,a)&&v(a,o)&&(t.push(o.i/r),t.push(n.i/r),t.push(a.i/r),b(n),b(n.next),n=e=a),n=n.next}while(n!==e);return n}function s(e,t,o,a,i,s){var l=e;do{for(var f=l.next.next;f!==l.prev;){if(l.i!==f.i&&d(l,f)){var c=m(l,f);return l=r(l,l.next),c=r(c,c.next),n(l,t,o,a,i,s),void n(c,t,o,a,i,s)}f=f.next}l=l.next}while(l!==e)}function l(e,t){return e.x-t.x}function f(e,t){if(t=function(e,t){var r,n=t,o=e.x,a=e.y,i=-1/0;do{if(a<=n.y&&a>=n.next.y){var s=n.x+(a-n.y)*(n.next.x-n.x)/(n.next.y-n.y);if(s<=o&&s>i){if(i=s,s===o){if(a===n.y)return n;if(a===n.next.y)return n.next}r=n.x<n.next.x?n:n.next}}n=n.next}while(n!==t);if(!r)return null;if(o===i)return r.prev;var l,f=r,c=r.x,u=r.y,d=1/0;n=r.next;for(;n!==f;)o>=n.x&&n.x>=c&&h(a<u?o:i,a,c,u,a<u?i:o,a,n.x,n.y)&&((l=Math.abs(a-n.y)/(o-n.x))<d||l===d&&n.x>r.x)&&v(n,e)&&(r=n,d=l),n=n.next;return r}(e,t)){var n=m(t,e);r(n,n.next)}}function c(e,t,r,n,o){return(e=1431655765&((e=858993459&((e=252645135&((e=16711935&((e=32767*(e-r)/o)|e<<8))|e<<4))|e<<2))|e<<1))|(t=1431655765&((t=858993459&((t=252645135&((t=16711935&((t=32767*(t-n)/o)|t<<8))|t<<4))|t<<2))|t<<1))<<1}function u(e){var t=e,r=e;do{t.x<r.x&&(r=t),t=t.next}while(t!==e);return r}function h(e,t,r,n,o,a,i,s){return(o-i)*(t-s)-(e-i)*(a-s)>=0&&(e-i)*(n-s)-(r-i)*(t-s)>=0&&(r-i)*(a-s)-(o-i)*(n-s)>=0}function d(e,t){return e.next.i!==t.i&&e.prev.i!==t.i&&!function(e,t){var r=e;do{if(r.i!==e.i&&r.next.i!==e.i&&r.i!==t.i&&r.next.i!==t.i&&x(r,r.next,e,t))return!0;r=r.next}while(r!==e);return!1}(e,t)&&v(e,t)&&v(t,e)&&function(e,t){var r=e,n=!1,o=(e.x+t.x)/2,a=(e.y+t.y)/2;do{r.y>a!=r.next.y>a&&o<(r.next.x-r.x)*(a-r.y)/(r.next.y-r.y)+r.x&&(n=!n),r=r.next}while(r!==e);return n}(e,t)}function p(e,t,r){return(t.y-e.y)*(r.x-t.x)-(t.x-e.x)*(r.y-t.y)}function g(e,t){return e.x===t.x&&e.y===t.y}function x(e,t,r,n){return!!(g(e,t)&&g(r,n)||g(e,n)&&g(r,t))||p(e,t,r)>0!=p(e,t,n)>0&&p(r,n,e)>0!=p(r,n,t)>0}function v(e,t){return p(e.prev,e,e.next)<0?p(e,t,e.next)>=0&&p(e,e.prev,t)>=0:p(e,t,e.prev)<0||p(e,e.next,t)<0}function m(e,t){var r=new M(e.i,e.x,e.y),n=new M(t.i,t.x,t.y),o=e.next,a=t.prev;return e.next=t,t.prev=e,r.next=o,o.prev=r,n.next=r,r.prev=n,a.next=n,n.prev=a,n}function y(e,t,r,n){var o=new M(e,t,r);return n?(o.next=n.next,o.prev=n,n.next.prev=o,n.next=o):(o.prev=o,o.next=o),o}function b(e){e.next.prev=e.prev,e.prev.next=e.next,e.prevZ&&(e.prevZ.nextZ=e.nextZ),e.nextZ&&(e.nextZ.prevZ=e.prevZ)}function M(e,t,r){this.i=e,this.x=t,this.y=r,this.prev=null,this.next=null,this.z=null,this.prevZ=null,this.nextZ=null,this.steiner=!1}function w(e,t,r,n){for(var o=0,a=t,i=r-n;a<r;a+=n)o+=(e[i]-e[a])*(e[a+1]+e[i+1]),i=a;return o}return e.deviation=function(e,t,r,n){var o,a,i=t&&t.length,s=i?t[0]*r:e.length,l=Math.abs(w(e,0,s,r));if(i)for(o=0,a=t.length;o<a;o++){var f=t[o]*r,c=o<a-1?t[o+1]*r:e.length;l-=Math.abs(w(e,f,c,r))}var u=0;for(o=0,a=n.length;o<a;o+=3){var h=n[o]*r,d=n[o+1]*r,p=n[o+2]*r;u+=Math.abs((e[h]-e[p])*(e[d+1]-e[h+1])-(e[h]-e[d])*(e[p+1]-e[h+1]))}return 0===l&&0===u?0:Math.abs((u-l)/l)},e.flatten=function(e){for(var t=e[0][0].length,r={vertices:[],holes:[],dimensions:t},n=0,o=0;o<e.length;o++){for(var a=0;a<e[o].length;a++)for(var i=0;i<t;i++)r.vertices.push(e[o][a][i]);o>0&&(n+=e[o-1].length,r.holes.push(n))}return r},e}();const triangulate=function(){const e=10,t=[.8627450980392157,.8235294117647058,.7843137254901961],r=3,n={brick:"#cc7755",bronze:"#ffeecc",canvas:"#fff8f0",concrete:"#999999",copper:"#a0e0d0",glass:"#e8f8f8",gold:"#ffcc00",plants:"#009933",metal:"#aaaaaa",panel:"#fff8f0",plaster:"#999999",roof_tiles:"#f08060",silver:"#cccccc",slate:"#666666",stone:"#996666",tar_paper:"#333333",wood:"#deb887"},o={asphalt:"tar_paper",bitumen:"tar_paper",block:"stone",bricks:"brick",glas:"glass",glassfront:"glass",grass:"plants",masonry:"stone",granite:"stone",panels:"panel",paving_stones:"stone",plastered:"plaster",rooftiles:"roof_tiles",roofingfelt:"tar_paper",sandstone:"stone",sheet:"canvas",sheets:"canvas",shingle:"tar_paper",shingles:"tar_paper",slates:"slate",steel:"metal",tar:"tar_paper",tent:"canvas",thatch:"plants",tile:"roof_tiles",tiles:"roof_tiles"},a=.5,i=6378137*Math.PI/180;function s(e){return"string"!=typeof e?null:"#"===(e=e.toLowerCase())[0]?e:n[o[e]||e]||null}function l(e,r){r=r||0;let n,o=Qolor.parse(e);return[(n=o.isValid()?o.saturation(.7).toArray():t)[0]+r,n[1]+r,n[2]+r]}return function(t,n,o,f,c){const u=[i*Math.cos(o[1]/180*Math.PI),i];(function(e){switch(e.type){case"MultiPolygon":return e.coordinates;case"Polygon":return[e.coordinates];default:return[]}})(n.geometry).map(i=>{const h=function(e,t,r){return e.map((e,n)=>(0===n!==function(e){return 0<e.reduce((e,t,r,n)=>e+(r<n.length-1?(n[r+1][0]-t[0])*(n[r+1][1]+t[1]):0),0)}(e)&&e.reverse(),e.map(function(e){return[(e[0]-t[0])*r[0],-(e[1]-t[1])*r[1]]})))}(i,o,u);!function(t,n,o,i,f){const c=function(t,n){const o={};switch(o.center=[n.minX+(n.maxX-n.minX)/2,n.minY+(n.maxY-n.minY)/2],o.radius=(n.maxX-n.minX)/2,o.roofHeight=t.roofHeight||(t.roofLevels?t.roofLevels*r:0),t.roofShape){case"cone":case"pyramid":case"dome":case"onion":o.roofHeight=o.roofHeight||1*o.radius;break;case"gabled":case"hipped":case"half-hipped":case"skillion":case"gambrel":case"mansard":case"round":o.roofHeight=o.roofHeight||1*r;break;case"flat":o.roofHeight=0;break;default:o.roofHeight=0}let a;if(o.wallZ=t.minHeight||(t.minLevel?t.minLevel*r:0),void 0!==t.height)a=t.height,o.roofHeight=Math.min(o.roofHeight,a),o.roofZ=a-o.roofHeight,o.wallHeight=a-o.roofHeight-o.wallZ;else if(void 0!==t.levels)a=t.levels*r,o.roofZ=a,o.wallHeight=a-o.wallZ;else{switch(t.shape){case"cone":case"dome":case"pyramid":a=2*o.radius,o.roofHeight=0;break;case"sphere":a=4*o.radius,o.roofHeight=0;break;case"none":a=0;break;default:a=e}o.roofZ=a,o.wallHeight=a-o.wallZ}return o}(n,function(e){let t=1/0,r=1/0,n=-1/0,o=-1/0;for(let a=0;a<e.length;a++)t=Math.min(t,e[a][0]),r=Math.min(r,e[a][1]),n=Math.max(n,e[a][0]),o=Math.max(o,e[a][1]);return{minX:t,minY:r,maxX:n,maxY:o}}(o[0])),u=l(i||n.wallColor||n.color||s(n.material),f),h=l(i||n.roofColor||s(n.roofMaterial),f);switch(n.shape){case"cone":return void split.cylinder(t,c.center,c.radius,0,c.wallHeight,c.wallZ,u);case"dome":return void split.dome(t,c.center,c.radius,c.wallHeight,c.wallZ,u);case"pyramid":return void split.pyramid(t,o,c.center,c.wallHeight,c.wallZ,u);case"sphere":return void split.sphere(t,c.center,c.radius,c.wallHeight,c.wallZ,u)}switch(createRoof(t,n,o,c,h,u),n.shape){case"none":return;case"cylinder":return void split.cylinder(t,c.center,c.radius,c.radius,c.wallHeight,c.wallZ,u);default:let e=.2,r=.4;"glass"!==n.material&&(e=0,r=0,n.levels&&(r=parseFloat(n.levels)-parseFloat(n.minLevel||0)<<0)),split.extrusion(t,o,c.wallHeight,c.wallZ,u,[0,a,e/c.wallHeight,r/c.wallHeight])}}(t,n.properties,h,f,c)})}}();var createRoof;function roundPoint(e,t){return[Math.round(e[0]*t)/t,Math.round(e[1]*t)/t]}function pointOnSegment(e,t){return e=roundPoint(e,1e6),t[0]=roundPoint(t[0],1e6),t[1]=roundPoint(t[1],1e6),e[0]>=Math.min(t[0][0],t[1][0])&&e[0]<=Math.max(t[1][0],t[0][0])&&e[1]>=Math.min(t[0][1],t[1][1])&&e[1]<=Math.max(t[1][1],t[0][1])}function getVectorSegmentIntersection(e,t,r){var n,o,a,i,s,l=r[0],f=[r[1][0]-r[0][0],r[1][1]-r[0][1]];if(0!==t[0]||0!==f[0]){if(0!==t[0]&&(a=t[1]/t[0],n=e[1]-a*e[0]),0!==f[0]&&(i=f[1]/f[0],o=l[1]-i*l[0]),0===t[0]&&pointOnSegment(s=[e[0],i*e[0]+o],r))return s;if(0===f[0]&&pointOnSegment(s=[l[0],a*l[0]+n],r))return s;if(a!==i){var c=(o-n)/(a-i);return pointOnSegment(s=[c,a*c+n],r)?s:void 0}}}function getDistanceToLine(e,t){var r=t[0],n=t[1];if(r[0]!==n[0]||r[1]!==n[1]){var o=(n[1]-r[1])/(n[0]-r[0]),a=r[1]-o*r[0];if(0===o)return Math.abs(a-e[1]);if(o===1/0)return Math.abs(r[0]-e[0]);var i=-1/o,s=(e[1]-i*e[0]-a)/(o-i),l=o*s+a,f=e[0]-s,c=e[1]-l;return Math.sqrt(f*f+c*c)}}!function(){function e(e,t,r){const n=((e-90)/180-.5)*Math.PI;return function(e,t,r){for(var n,o=[],a=0;a<r.length-1;a++)if(void 0!==(n=getVectorSegmentIntersection(e,t,[r[a],r[a+1]]))){if(2===o.length)return;a++,r.splice(a,0,n),o.push(a)}if(!(o.length<2))return{index:o,roof:r}}(t,[Math.cos(n),Math.sin(n)],r)}function t(t,n,o,a,i,s,l){if(0,o.length>1||void 0===n.roofDirection)return r(t,n,o,i,s);const f=e(n.roofDirection,i.center,o[0]);if(!f)return r(t,n,o,i,s);const c=f.index;let u=f.roof;{const e=function(e,t){const r=[e[t[0]],e[t[1]]];return e.map(e=>getDistanceToLine(e,r))}(u,f.index),r=Math.max(...e);let n=(u=u.map((t,n)=>[t[0],t[1],(1-e[n]/r)*i.roofHeight])).slice(c[0],c[1]+1);split.polygon(t,[n],i.roofZ,s),n=(n=u.slice(c[1],u.length-1)).concat(u.slice(0,c[0]+1)),split.polygon(t,[n],i.roofZ,s);for(let e=0;e<u.length-1;e++)0===u[e][2]&&0===u[e+1][2]||split.quad(t,[u[e][0],u[e][1],i.roofZ+u[e][2]],[u[e][0],u[e][1],i.roofZ],[u[e+1][0],u[e+1][1],i.roofZ],[u[e+1][0],u[e+1][1],i.roofZ+u[e+1][2]],l)}}function r(e,t,r,n,o){"cylinder"===t.shape?split.circle(e,n.center,n.radius,n.roofZ,o):split.polygon(e,r,n.roofZ,o)}createRoof=function(e,n,o,a,i,s){switch(n.roofShape){case"cone":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n),split.cylinder(e,r.center,r.radius,0,r.roofHeight,r.roofZ,n)}(e,o,a,i);case"dome":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n),split.dome(e,r.center,r.radius,r.roofHeight,r.roofZ,n)}(e,o,a,i);case"pyramid":return function(e,t,r,n,o){"cylinder"===t.shape?split.cylinder(e,n.center,n.radius,0,n.roofHeight,n.roofZ,o):split.pyramid(e,r,n.center,n.roofHeight,n.roofZ,o)}(e,n,o,a,i);case"skillion":return function(e,t,n,o,a,i){if(void 0===t.roofDirection)return r(e,t,n,o,a);var s,l,f=t.roofDirection/180*Math.PI,c=1/0,u=-1/0;n[0].forEach(function(e){var t=e[1]*Math.cos(-f)+e[0]*Math.sin(-f);t<c&&(c=t,s=e),t>u&&(u=t,l=e)});var h=n[0],d=[Math.cos(f),Math.sin(f)],p=[s,[s[0]+d[0],s[1]+d[1]]],g=getDistanceToLine(l,p);n.forEach(function(e){e.forEach(function(e){var t=getDistanceToLine(e,p);e[2]=t/g*o.roofHeight})}),split.polygon(e,[h],o.roofZ,a),n.forEach(function(t){for(var r=0;r<t.length-1;r++)0===t[r][2]&&0===t[r+1][2]||split.quad(e,[t[r][0],t[r][1],o.roofZ+t[r][2]],[t[r][0],t[r][1],o.roofZ],[t[r+1][0],t[r+1][1],o.roofZ],[t[r+1][0],t[r+1][1],o.roofZ+t[r+1][2]],i)})}(e,n,o,a,i,s);case"gabled":case"hipped":case"half-hipped":case"gambrel":case"mansard":return t(e,n,o,0,a,i,s);case"round":return function(e,t,n,o,a,i){if(n.length>1||void 0===t.roofDirection)return r(e,t,n,o,a);return r(e,t,n,o,a)}(e,n,o,a,i);case"onion":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n);for(var o,a,i=[{rScale:.8,hScale:0},{rScale:.9,hScale:.18},{rScale:.9,hScale:.35},{rScale:.8,hScale:.47},{rScale:.6,hScale:.59},{rScale:.5,hScale:.65},{rScale:.2,hScale:.82},{rScale:0,hScale:1}],s=0,l=i.length-1;s<l;s++)o=r.roofHeight*i[s].hScale,a=r.roofHeight*i[s+1].hScale,split.cylinder(e,r.center,r.radius*i[s].rScale,r.radius*i[s+1].rScale,a-o,r.roofZ+o,n)}(e,o,a,i);case"flat":default:return r(e,n,o,a,i)}}}();const split={NUM_Y_SEGMENTS:24,NUM_X_SEGMENTS:32,quad:(e,t,r,n,o,a)=>{split.triangle(e,t,r,n,a),split.triangle(e,n,o,t,a)},triangle:(e,t,r,n,o)=>{const a=vec3.normal(t,r,n);e.vertices.push(...t,...n,...r),e.normals.push(...a,...a,...a),e.colors.push(...o,...o,...o),e.texCoords.push(0,0,0,0,0,0)},circle:(e,t,r,n,o)=>{let a,i;n=n||0;for(let s=0;s<split.NUM_X_SEGMENTS;s++)a=s/split.NUM_X_SEGMENTS,i=(s+1)/split.NUM_X_SEGMENTS,split.triangle(e,[t[0]+r*Math.sin(a*Math.PI*2),t[1]+r*Math.cos(a*Math.PI*2),n],[t[0],t[1],n],[t[0]+r*Math.sin(i*Math.PI*2),t[1]+r*Math.cos(i*Math.PI*2),n],o)},polygon:(e,t,r,n)=>{r=r||0;const o=[],a=[];let i=0;t.forEach((e,n)=>{e.forEach(e=>{o.push(e[0],e[1],r+(e[2]||0))}),n&&(i+=t[n-1].length,a.push(i))});const s=earcut(o,a,3);for(let t=0;t<s.length-2;t+=3){const r=3*s[t],a=3*s[t+1],i=3*s[t+2];split.triangle(e,[o[r],o[r+1],o[r+2]],[o[a],o[a+1],o[a+2]],[o[i],o[i+1],o[i+2]],n)}},cube:(e,t,r,n,o,a,i,s)=>{const l=[o=o||0,a=a||0,i=i||0],f=[o+t,a,i],c=[o+t,a+r,i],u=[o,a+r,i],h=[o,a,i+n],d=[o+t,a,i+n],p=[o+t,a+r,i+n],g=[o,a+r,i+n];split.quad(e,f,l,u,c,s),split.quad(e,h,d,p,g,s),split.quad(e,l,f,d,h,s),split.quad(e,f,c,p,d,s),split.quad(e,c,u,g,p,s),split.quad(e,u,l,h,g,s)},cylinder:(e,t,r,n,o,a,i)=>{a=a||0;const s=split.NUM_X_SEGMENTS,l=2*Math.PI;let f,c,u,h,d,p;for(let g=0;g<s;g++)f=g/s*l,c=(g+1)/s*l,u=Math.sin(f),h=Math.cos(f),d=Math.sin(c),p=Math.cos(c),split.triangle(e,[t[0]+r*u,t[1]+r*h,a],[t[0]+n*d,t[1]+n*p,a+o],[t[0]+r*d,t[1]+r*p,a],i),0!==n&&split.triangle(e,[t[0]+n*u,t[1]+n*h,a+o],[t[0]+n*d,t[1]+n*p,a+o],[t[0]+r*u,t[1]+r*h,a],i)},dome:(e,t,r,n,o,a,i)=>{o=o||0;const s=split.NUM_Y_SEGMENTS/2,l=Math.PI/2,f=i?0:-l;let c,u,h,d,p,g,x,v,m,y;for(let i=0;i<s;i++)c=i/s*l+f,u=(i+1)/s*l+f,h=Math.cos(c),d=Math.sin(c),x=h*r,v=(p=Math.cos(u))*r,m=((g=Math.sin(u))-d)*n,y=o-g*n,split.cylinder(e,t,v,x,m,y,a)},sphere:(e,t,r,n,o,a)=>{o=o||0;let i=0;return i+=split.dome(e,t,r,n/2,o+n/2,a,!0),i+=split.dome(e,t,r,n/2,o+n/2,a)},pyramid:(e,t,r,n,o,a)=>{o=o||0;for(let i=0,s=(t=t[0]).length-1;i<s;i++)split.triangle(e,[t[i][0],t[i][1],o],[t[i+1][0],t[i+1][1],o],[r[0],r[1],o+n],a)},extrusion:(e,t,r,n,o,a)=>{n=n||0;let i,s,l,f,c,u,h,d,p,g,x,v,m=a[2]*r,y=a[3]*r;t.forEach(t=>{for(x=0,v=t.length-1;x<v;x++)i=t[x],s=t[x+1],l=vec2.len(vec2.sub(i,s)),f=[i[0],i[1],n],c=[s[0],s[1],n],u=[s[0],s[1],n+r],h=[i[0],i[1],n+r],d=vec3.normal(f,c,u),[].push.apply(e.vertices,[].concat(f,u,c,f,h,u)),[].push.apply(e.normals,[].concat(d,d,d,d,d,d)),[].push.apply(e.colors,[].concat(o,o,o,o,o,o)),p=a[0]*l<<0,g=a[1]*l<<0,e.texCoords.push(p,y,g,m,g,y,p,y,p,m,g,m)})}},vec3={len:e=>Math.sqrt(e[0]*e[0]+e[1]*e[1]+e[2]*e[2]),sub:(e,t)=>[e[0]-t[0],e[1]-t[1],e[2]-t[2]],unit:e=>{const t=vec3.len(e);return[e[0]/t,e[1]/t,e[2]/t]},normal:(e,t,r)=>{const n=vec3.sub(e,t),o=vec3.sub(t,r);return vec3.unit([n[1]*o[2]-n[2]*o[1],n[2]*o[0]-n[0]*o[2],n[0]*o[1]-n[1]*o[0]])}},vec2={len:e=>Math.sqrt(e[0]*e[0]+e[1]*e[1]),add:(e,t)=>[e[0]+t[0],e[1]+t[1]],sub:(e,t)=>[e[0]-t[0],e[1]-t[1]],dot:(e,t)=>e[1]*t[0]-e[0]*t[1],scale:(e,t)=>[e[0]*t,e[1]*t],equals:(e,t)=>e[0]===t[0]&&e[1]===t[1]};function getGeoJSONBounds(e){const t=e.type,r=e.coordinates,n=[1/0,1/0],o=[-1/0,-1/0];return"Polygon"===t&&r.length?(r[0].forEach(e=>{e[0]<n[0]&&(n[0]=e[0]),e[1]<n[1]&&(n[1]=e[1]),e[0]>o[0]&&(o[0]=e[0]),e[1]>o[1]&&(o[1]=e[1])}),{min:n,max:o}):"MultiPolygon"===t?(r.forEach(e=>{e[0]&&e[0].forEach(e=>{e[0]<n[0]&&(n[0]=e[0]),e[1]<n[1]&&(n[1]=e[1]),e[0]>o[0]&&(o[0]=e[0]),e[1]>o[1]&&(o[1]=e[1])})}),{min:n,max:o}):void 0}function getOBJBounds(e){const t=[1/0,1/0],r=[-1/0,-1/0];for(let n=0;n<e.length;n+=3)e[n]<t[0]&&(t[0]=e[0]),e[n+1]<t[1]&&(t[1]=e[n+1]),e[0]>r[0]&&(r[0]=e[0]),e[n+1]>r[1]&&(r[1]=e[n+1]);return t[0]*=METERS_PER_DEGREE_LATITUDE*Math.cos(t[1]/180*Math.PI),t[1]*=METERS_PER_DEGREE_LATITUDE,r[0]*=METERS_PER_DEGREE_LATITUDE*Math.cos(r[1]/180*Math.PI),r[1]*=METERS_PER_DEGREE_LATITUDE,{min:t,max:r}}const METERS_PER_DEGREE_LATITUDE=6378137*Math.PI/180;function getOrigin(e){const t=e.coordinates;switch(e.type){case"Point":return t;case"MultiPoint":case"LineString":return t[0];case"MultiLineString":case"Polygon":return t[0][0];case"MultiPolygon":return t[0][0][0]}}function getPickingColor(e){return[0,(255&++e)/255,(e>>8&255)/255]}function postResult(e,t,r){const n={items:e,position:t,vertices:new Float32Array(r.vertices),normals:new Float32Array(r.normals),colors:new Float32Array(r.colors),texCoords:new Float32Array(r.texCoords),heights:new Float32Array(r.heights),pickingColors:new Float32Array(r.pickingColors)};postMessage(n,[n.vertices.buffer,n.normals.buffer,n.colors.buffer,n.texCoords.buffer,n.heights.buffer,n.pickingColors.buffer])}function loadGeoJSON(e,t={}){"object"==typeof e?(postMessage("load"),processGeoJSON(e,t)):Request.getJSON(e,(e,r)=>{e?postMessage("error"):(postMessage("load"),processGeoJSON(r,t))})}function processGeoJSON(e,t){if(!e||!e.features.length)return void postMessage("error");const r={vertices:[],normals:[],colors:[],texCoords:[],heights:[],pickingColors:[]},n=[],o=getOrigin(e.features[0].geometry),a={latitude:o[1],longitude:o[0]};e.features.forEach((e,a)=>{const i=e.properties,s=t.id||e.id,l=getPickingColor(a);let f=r.vertices.length;triangulate(r,e,o),f=(r.vertices.length-f)/3;for(let e=0;e<f;e++)r.heights.push(i.height),r.pickingColors.push(...l);i.bounds=getGeoJSONBounds(e.geometry),n.push({id:s,properties:i,vertexCount:f})}),postResult(n,a,r)}function loadOBJ(e,t={}){Request.getText(e,(r,n)=>{if(r)return void postMessage("error");let o=n.match(/^mtllib\\s+(.*)$/m);o?Request.getText(e.replace(/[^\\/]+$/,"")+o[1],(e,r)=>{e?postMessage("error"):(postMessage("load"),processOBJ(n,r,t))}):(postMessage("load"),processOBJ(n,null,t))})}function processOBJ(e,t,r={}){const n={vertices:[],normals:[],colors:[],texCoords:[],heights:[],pickingColors:[]},o=[],a=Qolor.parse(r.color).toArray(),i=r.position;OBJ.parse(e,t,r.flipYZ).forEach((e,t)=>{n.vertices.push(...e.vertices),n.normals.push(...e.normals),n.texCoords.push(...e.texCoords);const i=r.id||e.id,s={},l=(i/2%2?-1:1)*(i%2?.03:.06),f=a||e.color||DEFAULT_COLOR,c=e.vertices.length/3,u=getPickingColor(t);for(let t=0;t<c;t++)n.colors.push(f[0]+l,f[1]+l,f[2]+l),n.heights.push(e.height),n.pickingColors.push(...u);s.height=e.height,s.color=e.color,s.bounds=getOBJBounds(e.vertices),o.push({id:i,properties:s,vertexCount:c})}),postResult(o,i,n)}onmessage=function(e){const t=e.data;"GeoJSON"===t.type&&loadGeoJSON(t.url,t.options),"OBJ"===t.type&&loadOBJ(t.url,t.options)};';
+workers['feature'] = 'class Request{static load(e,t){const r=new XMLHttpRequest,n=setTimeout(e=>{4!==r.readyState&&(r.abort(),t("status"))},1e4);return r.onreadystatechange=(()=>{4===r.readyState&&(clearTimeout(n),!r.status||r.status<200||r.status>299?t("status"):t(null,r))}),r.open("GET",e),r.send(null),{abort:()=>{r.abort()}}}static getText(e,t){return this.load(e,(e,r)=>{e?t(e):void 0!==r.responseText?t(null,r.responseText):t("content")})}static getXML(e,t){return this.load(e,(e,r)=>{e?t(e):void 0!==r.responseXML?t(null,r.responseXML):t("content")})}static getJSON(e,t){return this.load(e,(r,n)=>{if(r)return void t(r);if(!n.responseText)return void t("content");let o;try{o=JSON.parse(n.responseText),t(null,o)}catch(r){console.warn(`Could not parse JSON from ${e}\\n${r.message}`),t("content")}})}}class Qolor{constructor(e,t,r,n=1){this.r=this._clamp(e,1),this.g=this._clamp(t,1),this.b=this._clamp(r,1),this.a=this._clamp(n,1)}static parse(e){if("string"==typeof e){let t;if(e=e.toLowerCase(),t=(e=Qolor.w3cColors[e]||e).match(/^#?(\\w{2})(\\w{2})(\\w{2})$/))return new Qolor(parseInt(t[1],16)/255,parseInt(t[2],16)/255,parseInt(t[3],16)/255);if(t=e.match(/^#?(\\w)(\\w)(\\w)$/))return new Qolor(parseInt(t[1]+t[1],16)/255,parseInt(t[2]+t[2],16)/255,parseInt(t[3]+t[3],16)/255);if(t=e.match(/rgba?\\((\\d+)\\D+(\\d+)\\D+(\\d+)(\\D+([\\d.]+))?\\)/))return new Qolor(parseFloat(t[1])/255,parseFloat(t[2])/255,parseFloat(t[3])/255,t[4]?parseFloat(t[5]):1)}return new Qolor}static fromHSL(e,t,r,n){const o=(new Qolor).fromHSL(e,t,r);return o.a=void 0===n?1:n,o}_hue2rgb(e,t,r){return r<0&&(r+=1),r>1&&(r-=1),r<1/6?e+6*(t-e)*r:r<.5?t:r<2/3?e+(t-e)*(2/3-r)*6:e}_clamp(e,t){if(void 0!==e)return Math.min(t,Math.max(0,e||0))}isValid(){return void 0!==this.r&&void 0!==this.g&&void 0!==this.b}toHSL(){if(!this.isValid())return;const e=Math.max(this.r,this.g,this.b),t=Math.min(this.r,this.g,this.b),r=e-t,n=(e+t)/2;if(!r)return{h:0,s:0,l:n};const o=n>.5?r/(2-e-t):r/(e+t);let a;switch(e){case this.r:a=(this.g-this.b)/r+(this.g<this.b?6:0);break;case this.g:a=(this.b-this.r)/r+2;break;case this.b:a=(this.r-this.g)/r+4}return{h:a*=60,s:o,l:n}}fromHSL(e,t,r){if(0===t)return this.r=this.g=this.b=r,this;const n=r<.5?r*(1+t):r+t-r*t,o=2*r-n;return e/=360,this.r=this._hue2rgb(o,n,e+1/3),this.g=this._hue2rgb(o,n,e),this.b=this._hue2rgb(o,n,e-1/3),this}toString(){if(this.isValid())return 1===this.a?"#"+((1<<24)+(Math.round(255*this.r)<<16)+(Math.round(255*this.g)<<8)+Math.round(255*this.b)).toString(16).slice(1,7):`rgba(${Math.round(255*this.r)},${Math.round(255*this.g)},${Math.round(255*this.b)},${this.a.toFixed(2)})`}toArray(){if(this.isValid)return[this.r,this.g,this.b]}hue(e){const t=this.toHSL();return this.fromHSL(t.h+e,t.s,t.l)}saturation(e){const t=this.toHSL();return this.fromHSL(t.h,t.s*e,t.l)}lightness(e){const t=this.toHSL();return this.fromHSL(t.h,t.s,t.l*e)}clone(){return new Qolor(this.r,this.g,this.b,this.a)}}Qolor.w3cColors={aliceblue:"#f0f8ff",antiquewhite:"#faebd7",aqua:"#00ffff",aquamarine:"#7fffd4",azure:"#f0ffff",beige:"#f5f5dc",bisque:"#ffe4c4",black:"#000000",blanchedalmond:"#ffebcd",blue:"#0000ff",blueviolet:"#8a2be2",brown:"#a52a2a",burlywood:"#deb887",cadetblue:"#5f9ea0",chartreuse:"#7fff00",chocolate:"#d2691e",coral:"#ff7f50",cornflowerblue:"#6495ed",cornsilk:"#fff8dc",crimson:"#dc143c",cyan:"#00ffff",darkblue:"#00008b",darkcyan:"#008b8b",darkgoldenrod:"#b8860b",darkgray:"#a9a9a9",darkgrey:"#a9a9a9",darkgreen:"#006400",darkkhaki:"#bdb76b",darkmagenta:"#8b008b",darkolivegreen:"#556b2f",darkorange:"#ff8c00",darkorchid:"#9932cc",darkred:"#8b0000",darksalmon:"#e9967a",darkseagreen:"#8fbc8f",darkslateblue:"#483d8b",darkslategray:"#2f4f4f",darkslategrey:"#2f4f4f",darkturquoise:"#00ced1",darkviolet:"#9400d3",deeppink:"#ff1493",deepskyblue:"#00bfff",dimgray:"#696969",dimgrey:"#696969",dodgerblue:"#1e90ff",firebrick:"#b22222",floralwhite:"#fffaf0",forestgreen:"#228b22",fuchsia:"#ff00ff",gainsboro:"#dcdcdc",ghostwhite:"#f8f8ff",gold:"#ffd700",goldenrod:"#daa520",gray:"#808080",grey:"#808080",green:"#008000",greenyellow:"#adff2f",honeydew:"#f0fff0",hotpink:"#ff69b4",indianred:"#cd5c5c",indigo:"#4b0082",ivory:"#fffff0",khaki:"#f0e68c",lavender:"#e6e6fa",lavenderblush:"#fff0f5",lawngreen:"#7cfc00",lemonchiffon:"#fffacd",lightblue:"#add8e6",lightcoral:"#f08080",lightcyan:"#e0ffff",lightgoldenrodyellow:"#fafad2",lightgray:"#d3d3d3",lightgrey:"#d3d3d3",lightgreen:"#90ee90",lightpink:"#ffb6c1",lightsalmon:"#ffa07a",lightseagreen:"#20b2aa",lightskyblue:"#87cefa",lightslategray:"#778899",lightslategrey:"#778899",lightsteelblue:"#b0c4de",lightyellow:"#ffffe0",lime:"#00ff00",limegreen:"#32cd32",linen:"#faf0e6",magenta:"#ff00ff",maroon:"#800000",mediumaquamarine:"#66cdaa",mediumblue:"#0000cd",mediumorchid:"#ba55d3",mediumpurple:"#9370db",mediumseagreen:"#3cb371",mediumslateblue:"#7b68ee",mediumspringgreen:"#00fa9a",mediumturquoise:"#48d1cc",mediumvioletred:"#c71585",midnightblue:"#191970",mintcream:"#f5fffa",mistyrose:"#ffe4e1",moccasin:"#ffe4b5",navajowhite:"#ffdead",navy:"#000080",oldlace:"#fdf5e6",olive:"#808000",olivedrab:"#6b8e23",orange:"#ffa500",orangered:"#ff4500",orchid:"#da70d6",palegoldenrod:"#eee8aa",palegreen:"#98fb98",paleturquoise:"#afeeee",palevioletred:"#db7093",papayawhip:"#ffefd5",peachpuff:"#ffdab9",peru:"#cd853f",pink:"#ffc0cb",plum:"#dda0dd",powderblue:"#b0e0e6",purple:"#800080",rebeccapurple:"#663399",red:"#ff0000",rosybrown:"#bc8f8f",royalblue:"#4169e1",saddlebrown:"#8b4513",salmon:"#fa8072",sandybrown:"#f4a460",seagreen:"#2e8b57",seashell:"#fff5ee",sienna:"#a0522d",silver:"#c0c0c0",skyblue:"#87ceeb",slateblue:"#6a5acd",slategray:"#708090",slategrey:"#708090",snow:"#fffafa",springgreen:"#00ff7f",steelblue:"#4682b4",tan:"#d2b48c",teal:"#008080",thistle:"#d8bfd8",tomato:"#ff6347",turquoise:"#40e0d0",violet:"#ee82ee",wheat:"#f5deb3",white:"#ffffff",whitesmoke:"#f5f5f5",yellow:"#ffff00",yellowgreen:"#9acd32"},"undefined"!=typeof module&&(module.exports=Qolor);class OBJ{constructor(e,t,r){this.flipYZ=r,this.materialIndex={},this.vertexIndex=[],t&&this.readMTL(t),this.meshes=[],this.readOBJ(e)}readMTL(e){const t=e.split(/[\\r\\n]/g);let r,n=[];t.forEach(e=>{const t=e.trim().split(/\\s+/);switch(t[0]){case"newmtl":r&&(this.materialIndex[r]=n),r=t[1],n=[];break;case"Kd":n=[parseFloat(t[1]),parseFloat(t[2]),parseFloat(t[3])]}}),r&&(this.materialIndex[r]=n),e=null}readOBJ(e){let t,r,n=[];e.split(/[\\r\\n]/g).forEach(e=>{const o=e.trim().split(/\\s+/);switch(o[0]){case"g":case"o":this.storeMesh(t,r,n),t=o[1],n=[];break;case"usemtl":this.storeMesh(t,r,n),this.materialIndex[o[1]]&&(r=this.materialIndex[o[1]]),n=[];break;case"v":this.flipYZ?this.vertexIndex.push([parseFloat(o[1]),parseFloat(o[3]),parseFloat(o[2])]):this.vertexIndex.push([parseFloat(o[1]),parseFloat(o[2]),parseFloat(o[3])]);break;case"f":n.push([parseFloat(o[1])-1,parseFloat(o[2])-1,parseFloat(o[3])-1])}}),this.storeMesh(t,r,n)}storeMesh(e,t,r){if(r.length){const n=this.createGeometry(r);this.meshes.push({vertices:n.vertices,normals:n.normals,texCoords:n.texCoords,height:n.height,color:t,id:e})}}sub(e,t){return[e[0]-t[0],e[1]-t[1],e[2]-t[2]]}len(e){return Math.sqrt(e[0]*e[0]+e[1]*e[1]+e[2]*e[2])}unit(e){const t=this.len(e);return[e[0]/t,e[1]/t,e[2]/t]}normal(e,t,r){const n=this.sub(e,t),o=this.sub(t,r);return this.unit([n[1]*o[2]-n[2]*o[1],n[2]*o[0]-n[0]*o[2],n[0]*o[1]-n[1]*o[0]])}createGeometry(e){const t=[],r=[],n=[];let o=-1/0;return e.forEach(e=>{const a=this.vertexIndex[e[0]],s=this.vertexIndex[e[1]],i=this.vertexIndex[e[2]],l=this.normal(a,s,i);t.push(a[0],a[2],a[1],s[0],s[2],s[1],i[0],i[2],i[1]),r.push(l[0],l[1],l[2],l[0],l[1],l[2],l[0],l[1],l[2]),n.push(0,0,0,0,0,0),o=Math.max(o,a[1],s[1],i[1])}),{vertices:t,normals:r,texCoords:n,height:o}}}OBJ.parse=function(e,t,r){return new OBJ(e,t,r).meshes};var earcut=function(){function e(e,o,a){a=a||2;var s,i,c,u,d,p,g,x=o&&o.length,v=x?o[0]*a:e.length,m=t(e,0,v,a,!0),y=[];if(!m)return y;if(x&&(m=function(e,n,o,a){var s,i,c,u,d,p=[];for(s=0,i=n.length;s<i;s++)c=n[s]*a,u=s<i-1?n[s+1]*a:e.length,(d=t(e,c,u,a,!1))===d.next&&(d.steiner=!0),p.push(h(d));for(p.sort(l),s=0;s<p.length;s++)f(p[s],o),o=r(o,o.next);return o}(e,o,m,a)),e.length>80*a){s=c=e[0],i=u=e[1];for(var b=a;b<v;b+=a)(d=e[b])<s&&(s=d),(p=e[b+1])<i&&(i=p),d>c&&(c=d),p>u&&(u=p);g=Math.max(c-s,u-i)}return n(m,y,a,s,i,g),y}function t(e,t,r,n,o){var a,s;if(o===w(e,t,r,n)>0)for(a=t;a<r;a+=n)s=y(a,e[a],e[a+1],s);else for(a=r-n;a>=t;a-=n)s=y(a,e[a],e[a+1],s);return s&&g(s,s.next)&&(b(s),s=s.next),s}function r(e,t){if(!e)return e;t||(t=e);var r,n=e;do{if(r=!1,n.steiner||!g(n,n.next)&&0!==p(n.prev,n,n.next))n=n.next;else{if(b(n),(n=t=n.prev)===n.next)return null;r=!0}}while(r||n!==t);return t}function n(e,t,l,f,h,u,d){if(e){!d&&u&&function(e,t,r,n){var o=e;do{null===o.z&&(o.z=c(o.x,o.y,t,r,n)),o.prevZ=o.prev,o.nextZ=o.next,o=o.next}while(o!==e);o.prevZ.nextZ=null,o.prevZ=null,function(e){var t,r,n,o,a,s,i,l,f=1;do{for(r=e,e=null,a=null,s=0;r;){for(s++,n=r,i=0,t=0;t<f&&(i++,n=n.nextZ);t++);for(l=f;i>0||l>0&&n;)0===i?(o=n,n=n.nextZ,l--):0!==l&&n?r.z<=n.z?(o=r,r=r.nextZ,i--):(o=n,n=n.nextZ,l--):(o=r,r=r.nextZ,i--),a?a.nextZ=o:e=o,o.prevZ=a,a=o;r=n}a.nextZ=null,f*=2}while(s>1)}(o)}(e,f,h,u);for(var p,g,x=e;e.prev!==e.next;)if(p=e.prev,g=e.next,u?a(e,f,h,u):o(e))t.push(p.i/l),t.push(e.i/l),t.push(g.i/l),b(e),e=g.next,x=g.next;else if((e=g)===x){d?1===d?n(e=s(e,t,l),t,l,f,h,u,2):2===d&&i(e,t,l,f,h,u):n(r(e),t,l,f,h,u,1);break}}}function o(e){var t=e.prev,r=e,n=e.next;if(p(t,r,n)>=0)return!1;for(var o=e.next.next;o!==e.prev;){if(u(t.x,t.y,r.x,r.y,n.x,n.y,o.x,o.y)&&p(o.prev,o,o.next)>=0)return!1;o=o.next}return!0}function a(e,t,r,n){var o=e.prev,a=e,s=e.next;if(p(o,a,s)>=0)return!1;for(var i=o.x<a.x?o.x<s.x?o.x:s.x:a.x<s.x?a.x:s.x,l=o.y<a.y?o.y<s.y?o.y:s.y:a.y<s.y?a.y:s.y,f=o.x>a.x?o.x>s.x?o.x:s.x:a.x>s.x?a.x:s.x,h=o.y>a.y?o.y>s.y?o.y:s.y:a.y>s.y?a.y:s.y,d=c(i,l,t,r,n),g=c(f,h,t,r,n),x=e.nextZ;x&&x.z<=g;){if(x!==e.prev&&x!==e.next&&u(o.x,o.y,a.x,a.y,s.x,s.y,x.x,x.y)&&p(x.prev,x,x.next)>=0)return!1;x=x.nextZ}for(x=e.prevZ;x&&x.z>=d;){if(x!==e.prev&&x!==e.next&&u(o.x,o.y,a.x,a.y,s.x,s.y,x.x,x.y)&&p(x.prev,x,x.next)>=0)return!1;x=x.prevZ}return!0}function s(e,t,r){var n=e;do{var o=n.prev,a=n.next.next;!g(o,a)&&x(o,n,n.next,a)&&v(o,a)&&v(a,o)&&(t.push(o.i/r),t.push(n.i/r),t.push(a.i/r),b(n),b(n.next),n=e=a),n=n.next}while(n!==e);return n}function i(e,t,o,a,s,i){var l=e;do{for(var f=l.next.next;f!==l.prev;){if(l.i!==f.i&&d(l,f)){var c=m(l,f);return l=r(l,l.next),c=r(c,c.next),n(l,t,o,a,s,i),void n(c,t,o,a,s,i)}f=f.next}l=l.next}while(l!==e)}function l(e,t){return e.x-t.x}function f(e,t){if(t=function(e,t){var r,n=t,o=e.x,a=e.y,s=-1/0;do{if(a<=n.y&&a>=n.next.y){var i=n.x+(a-n.y)*(n.next.x-n.x)/(n.next.y-n.y);if(i<=o&&i>s){if(s=i,i===o){if(a===n.y)return n;if(a===n.next.y)return n.next}r=n.x<n.next.x?n:n.next}}n=n.next}while(n!==t);if(!r)return null;if(o===s)return r.prev;var l,f=r,c=r.x,h=r.y,d=1/0;n=r.next;for(;n!==f;)o>=n.x&&n.x>=c&&u(a<h?o:s,a,c,h,a<h?s:o,a,n.x,n.y)&&((l=Math.abs(a-n.y)/(o-n.x))<d||l===d&&n.x>r.x)&&v(n,e)&&(r=n,d=l),n=n.next;return r}(e,t)){var n=m(t,e);r(n,n.next)}}function c(e,t,r,n,o){return(e=1431655765&((e=858993459&((e=252645135&((e=16711935&((e=32767*(e-r)/o)|e<<8))|e<<4))|e<<2))|e<<1))|(t=1431655765&((t=858993459&((t=252645135&((t=16711935&((t=32767*(t-n)/o)|t<<8))|t<<4))|t<<2))|t<<1))<<1}function h(e){var t=e,r=e;do{t.x<r.x&&(r=t),t=t.next}while(t!==e);return r}function u(e,t,r,n,o,a,s,i){return(o-s)*(t-i)-(e-s)*(a-i)>=0&&(e-s)*(n-i)-(r-s)*(t-i)>=0&&(r-s)*(a-i)-(o-s)*(n-i)>=0}function d(e,t){return e.next.i!==t.i&&e.prev.i!==t.i&&!function(e,t){var r=e;do{if(r.i!==e.i&&r.next.i!==e.i&&r.i!==t.i&&r.next.i!==t.i&&x(r,r.next,e,t))return!0;r=r.next}while(r!==e);return!1}(e,t)&&v(e,t)&&v(t,e)&&function(e,t){var r=e,n=!1,o=(e.x+t.x)/2,a=(e.y+t.y)/2;do{r.y>a!=r.next.y>a&&o<(r.next.x-r.x)*(a-r.y)/(r.next.y-r.y)+r.x&&(n=!n),r=r.next}while(r!==e);return n}(e,t)}function p(e,t,r){return(t.y-e.y)*(r.x-t.x)-(t.x-e.x)*(r.y-t.y)}function g(e,t){return e.x===t.x&&e.y===t.y}function x(e,t,r,n){return!!(g(e,t)&&g(r,n)||g(e,n)&&g(r,t))||p(e,t,r)>0!=p(e,t,n)>0&&p(r,n,e)>0!=p(r,n,t)>0}function v(e,t){return p(e.prev,e,e.next)<0?p(e,t,e.next)>=0&&p(e,e.prev,t)>=0:p(e,t,e.prev)<0||p(e,e.next,t)<0}function m(e,t){var r=new M(e.i,e.x,e.y),n=new M(t.i,t.x,t.y),o=e.next,a=t.prev;return e.next=t,t.prev=e,r.next=o,o.prev=r,n.next=r,r.prev=n,a.next=n,n.prev=a,n}function y(e,t,r,n){var o=new M(e,t,r);return n?(o.next=n.next,o.prev=n,n.next.prev=o,n.next=o):(o.prev=o,o.next=o),o}function b(e){e.next.prev=e.prev,e.prev.next=e.next,e.prevZ&&(e.prevZ.nextZ=e.nextZ),e.nextZ&&(e.nextZ.prevZ=e.prevZ)}function M(e,t,r){this.i=e,this.x=t,this.y=r,this.prev=null,this.next=null,this.z=null,this.prevZ=null,this.nextZ=null,this.steiner=!1}function w(e,t,r,n){for(var o=0,a=t,s=r-n;a<r;a+=n)o+=(e[s]-e[a])*(e[a+1]+e[s+1]),s=a;return o}return e.deviation=function(e,t,r,n){var o,a,s=t&&t.length,i=s?t[0]*r:e.length,l=Math.abs(w(e,0,i,r));if(s)for(o=0,a=t.length;o<a;o++){var f=t[o]*r,c=o<a-1?t[o+1]*r:e.length;l-=Math.abs(w(e,f,c,r))}var h=0;for(o=0,a=n.length;o<a;o+=3){var u=n[o]*r,d=n[o+1]*r,p=n[o+2]*r;h+=Math.abs((e[u]-e[p])*(e[d+1]-e[u+1])-(e[u]-e[d])*(e[p+1]-e[u+1]))}return 0===l&&0===h?0:Math.abs((h-l)/l)},e.flatten=function(e){for(var t=e[0][0].length,r={vertices:[],holes:[],dimensions:t},n=0,o=0;o<e.length;o++){for(var a=0;a<e[o].length;a++)for(var s=0;s<t;s++)r.vertices.push(e[o][a][s]);o>0&&(n+=e[o-1].length,r.holes.push(n))}return r},e}();const triangulate=function(){const e=10,t=[.8627450980392157,.8235294117647058,.7843137254901961],r=3,n={brick:"#cc7755",bronze:"#ffeecc",canvas:"#fff8f0",concrete:"#999999",copper:"#a0e0d0",glass:"#e8f8f8",gold:"#ffcc00",plants:"#009933",metal:"#aaaaaa",panel:"#fff8f0",plaster:"#999999",roof_tiles:"#f08060",silver:"#cccccc",slate:"#666666",stone:"#996666",tar_paper:"#333333",wood:"#deb887"},o={asphalt:"tar_paper",bitumen:"tar_paper",block:"stone",bricks:"brick",glas:"glass",glassfront:"glass",grass:"plants",masonry:"stone",granite:"stone",panels:"panel",paving_stones:"stone",plastered:"plaster",rooftiles:"roof_tiles",roofingfelt:"tar_paper",sandstone:"stone",sheet:"canvas",sheets:"canvas",shingle:"tar_paper",shingles:"tar_paper",slates:"slate",steel:"metal",tar:"tar_paper",tent:"canvas",thatch:"plants",tile:"roof_tiles",tiles:"roof_tiles"},a=.5,s=6378137*Math.PI/180;function i(e){return"string"!=typeof e?null:"#"===(e=e.toLowerCase())[0]?e:n[o[e]||e]||null}function l(e,r){r=r||0;let n,o=Qolor.parse(e);return[(n=o.isValid()?o.saturation(.7).toArray():t)[0]+r,n[1]+r,n[2]+r]}return function(t,n,o,f,c){const h=[s*Math.cos(o[1]/180*Math.PI),s];(function(e){switch(e.type){case"MultiPolygon":return e.coordinates;case"Polygon":return[e.coordinates];default:return[]}})(n.geometry).map(s=>{const u=function(e,t,r){return e.map((e,n)=>(0===n!==function(e){return 0<e.reduce((e,t,r,n)=>e+(r<n.length-1?(n[r+1][0]-t[0])*(n[r+1][1]+t[1]):0),0)}(e)&&e.reverse(),e.map(function(e){return[(e[0]-t[0])*r[0],-(e[1]-t[1])*r[1]]})))}(s,o,h);!function(t,n,o,s,f){const c=function(t,n){const o={};switch(o.center=[n.minX+(n.maxX-n.minX)/2,n.minY+(n.maxY-n.minY)/2],o.radius=(n.maxX-n.minX)/2,o.roofHeight=t.roofHeight||(t.roofLevels?t.roofLevels*r:0),t.roofShape){case"cone":case"pyramid":case"dome":case"onion":o.roofHeight=o.roofHeight||1*o.radius;break;case"gabled":case"hipped":case"half-hipped":case"skillion":case"gambrel":case"mansard":case"round":o.roofHeight=o.roofHeight||1*r;break;case"flat":o.roofHeight=0;break;default:o.roofHeight=0}let a;if(o.wallZ=t.minHeight||(t.minLevel?t.minLevel*r:0),void 0!==t.height)a=t.height,o.roofHeight=Math.min(o.roofHeight,a),o.roofZ=a-o.roofHeight,o.wallHeight=a-o.roofHeight-o.wallZ;else if(void 0!==t.levels)a=t.levels*r,o.roofZ=a,o.wallHeight=a-o.wallZ;else{switch(t.shape){case"cone":case"dome":case"pyramid":a=2*o.radius,o.roofHeight=0;break;case"sphere":a=4*o.radius,o.roofHeight=0;break;case"none":a=0;break;default:a=e}o.roofZ=a,o.wallHeight=a-o.wallZ}return o}(n,function(e){let t=1/0,r=1/0,n=-1/0,o=-1/0;for(let a=0;a<e.length;a++)t=Math.min(t,e[a][0]),r=Math.min(r,e[a][1]),n=Math.max(n,e[a][0]),o=Math.max(o,e[a][1]);return{minX:t,minY:r,maxX:n,maxY:o}}(o[0])),h=l(s||n.wallColor||n.color||i(n.material),f),u=l(s||n.roofColor||i(n.roofMaterial),f);switch(n.shape){case"cone":return void split.cylinder(t,c.center,c.radius,0,c.wallHeight,c.wallZ,h);case"dome":return void split.dome(t,c.center,c.radius,c.wallHeight,c.wallZ,h);case"pyramid":return void split.pyramid(t,o,c.center,c.wallHeight,c.wallZ,h);case"sphere":return void split.sphere(t,c.center,c.radius,c.wallHeight,c.wallZ,h)}switch(createRoof(t,n,o,c,u,h),n.shape){case"none":return;case"cylinder":return void split.cylinder(t,c.center,c.radius,c.radius,c.wallHeight,c.wallZ,h);default:let e=.2,r=.4;"glass"!==n.material&&(e=0,r=0,n.levels&&(r=parseFloat(n.levels)-parseFloat(n.minLevel||0)<<0)),split.extrusion(t,o,c.wallHeight,c.wallZ,h,[0,a,e/c.wallHeight,r/c.wallHeight])}}(t,n.properties,u,f,c)})}}();var createRoof;function roundPoint(e,t){return[Math.round(e[0]*t)/t,Math.round(e[1]*t)/t]}function pointOnSegment(e,t){return e=roundPoint(e,1e6),t[0]=roundPoint(t[0],1e6),t[1]=roundPoint(t[1],1e6),e[0]>=Math.min(t[0][0],t[1][0])&&e[0]<=Math.max(t[1][0],t[0][0])&&e[1]>=Math.min(t[0][1],t[1][1])&&e[1]<=Math.max(t[1][1],t[0][1])}function getVectorSegmentIntersection(e,t,r){var n,o,a,s,i,l=r[0],f=[r[1][0]-r[0][0],r[1][1]-r[0][1]];if(0!==t[0]||0!==f[0]){if(0!==t[0]&&(a=t[1]/t[0],n=e[1]-a*e[0]),0!==f[0]&&(s=f[1]/f[0],o=l[1]-s*l[0]),0===t[0]&&pointOnSegment(i=[e[0],s*e[0]+o],r))return i;if(0===f[0]&&pointOnSegment(i=[l[0],a*l[0]+n],r))return i;if(a!==s){var c=(o-n)/(a-s);return pointOnSegment(i=[c,a*c+n],r)?i:void 0}}}function getDistanceToLine(e,t){var r=t[0],n=t[1];if(r[0]!==n[0]||r[1]!==n[1]){var o=(n[1]-r[1])/(n[0]-r[0]),a=r[1]-o*r[0];if(0===o)return Math.abs(a-e[1]);if(o===1/0)return Math.abs(r[0]-e[0]);var s=-1/o,i=(e[1]-s*e[0]-a)/(o-s),l=o*i+a,f=e[0]-i,c=e[1]-l;return Math.sqrt(f*f+c*c)}}!function(){function e(e,t,r){const n=((e-90)/180-.5)*Math.PI;return function(e,t,r){for(var n,o=[],a=0;a<r.length-1;a++)if(void 0!==(n=getVectorSegmentIntersection(e,t,[r[a],r[a+1]]))){if(2===o.length)return;a++,r.splice(a,0,n),o.push(a)}if(!(o.length<2))return{index:o,roof:r}}(t,[Math.cos(n),Math.sin(n)],r)}function t(t,n,o,a,s,i,l){if(0,o.length>1||void 0===n.roofDirection)return r(t,n,o,s,i);const f=e(n.roofDirection,s.center,o[0]);if(!f)return r(t,n,o,s,i);const c=f.index;let h=f.roof;{const e=function(e,t){const r=[e[t[0]],e[t[1]]];return e.map(e=>getDistanceToLine(e,r))}(h,f.index),r=Math.max(...e);let n=(h=h.map((t,n)=>[t[0],t[1],(1-e[n]/r)*s.roofHeight])).slice(c[0],c[1]+1);split.polygon(t,[n],s.roofZ,i),n=(n=h.slice(c[1],h.length-1)).concat(h.slice(0,c[0]+1)),split.polygon(t,[n],s.roofZ,i);for(let e=0;e<h.length-1;e++)0===h[e][2]&&0===h[e+1][2]||split.quad(t,[h[e][0],h[e][1],s.roofZ+h[e][2]],[h[e][0],h[e][1],s.roofZ],[h[e+1][0],h[e+1][1],s.roofZ],[h[e+1][0],h[e+1][1],s.roofZ+h[e+1][2]],l)}}function r(e,t,r,n,o){"cylinder"===t.shape?split.circle(e,n.center,n.radius,n.roofZ,o):split.polygon(e,r,n.roofZ,o)}createRoof=function(e,n,o,a,s,i){switch(n.roofShape){case"cone":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n),split.cylinder(e,r.center,r.radius,0,r.roofHeight,r.roofZ,n)}(e,o,a,s);case"dome":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n),split.dome(e,r.center,r.radius,r.roofHeight,r.roofZ,n)}(e,o,a,s);case"pyramid":return function(e,t,r,n,o){"cylinder"===t.shape?split.cylinder(e,n.center,n.radius,0,n.roofHeight,n.roofZ,o):split.pyramid(e,r,n.center,n.roofHeight,n.roofZ,o)}(e,n,o,a,s);case"skillion":return function(e,t,n,o,a,s){if(void 0===t.roofDirection)return r(e,t,n,o,a);var i,l,f=t.roofDirection/180*Math.PI,c=1/0,h=-1/0;n[0].forEach(function(e){var t=e[1]*Math.cos(-f)+e[0]*Math.sin(-f);t<c&&(c=t,i=e),t>h&&(h=t,l=e)});var u=n[0],d=[Math.cos(f),Math.sin(f)],p=[i,[i[0]+d[0],i[1]+d[1]]],g=getDistanceToLine(l,p);n.forEach(function(e){e.forEach(function(e){var t=getDistanceToLine(e,p);e[2]=t/g*o.roofHeight})}),split.polygon(e,[u],o.roofZ,a),n.forEach(function(t){for(var r=0;r<t.length-1;r++)0===t[r][2]&&0===t[r+1][2]||split.quad(e,[t[r][0],t[r][1],o.roofZ+t[r][2]],[t[r][0],t[r][1],o.roofZ],[t[r+1][0],t[r+1][1],o.roofZ],[t[r+1][0],t[r+1][1],o.roofZ+t[r+1][2]],s)})}(e,n,o,a,s,i);case"gabled":case"hipped":case"half-hipped":case"gambrel":case"mansard":return t(e,n,o,0,a,s,i);case"round":return function(e,t,n,o,a,s){if(n.length>1||void 0===t.roofDirection)return r(e,t,n,o,a);return r(e,t,n,o,a)}(e,n,o,a,s);case"onion":return function(e,t,r,n){split.polygon(e,t,r.roofZ,n);for(var o,a,s=[{rScale:.8,hScale:0},{rScale:.9,hScale:.18},{rScale:.9,hScale:.35},{rScale:.8,hScale:.47},{rScale:.6,hScale:.59},{rScale:.5,hScale:.65},{rScale:.2,hScale:.82},{rScale:0,hScale:1}],i=0,l=s.length-1;i<l;i++)o=r.roofHeight*s[i].hScale,a=r.roofHeight*s[i+1].hScale,split.cylinder(e,r.center,r.radius*s[i].rScale,r.radius*s[i+1].rScale,a-o,r.roofZ+o,n)}(e,o,a,s);case"flat":default:return r(e,n,o,a,s)}}}();const split={NUM_Y_SEGMENTS:24,NUM_X_SEGMENTS:32,quad:(e,t,r,n,o,a)=>{split.triangle(e,t,r,n,a),split.triangle(e,n,o,t,a)},triangle:(e,t,r,n,o)=>{const a=vec3.normal(t,r,n);e.vertices.push(...t,...n,...r),e.normals.push(...a,...a,...a),e.colors.push(...o,...o,...o),e.texCoords.push(0,0,0,0,0,0)},circle:(e,t,r,n,o)=>{let a,s;n=n||0;for(let i=0;i<split.NUM_X_SEGMENTS;i++)a=i/split.NUM_X_SEGMENTS,s=(i+1)/split.NUM_X_SEGMENTS,split.triangle(e,[t[0]+r*Math.sin(a*Math.PI*2),t[1]+r*Math.cos(a*Math.PI*2),n],[t[0],t[1],n],[t[0]+r*Math.sin(s*Math.PI*2),t[1]+r*Math.cos(s*Math.PI*2),n],o)},polygon:(e,t,r,n)=>{r=r||0;const o=[],a=[];let s=0;t.forEach((e,n)=>{e.forEach(e=>{o.push(e[0],e[1],r+(e[2]||0))}),n&&(s+=t[n-1].length,a.push(s))});const i=earcut(o,a,3);for(let t=0;t<i.length-2;t+=3){const r=3*i[t],a=3*i[t+1],s=3*i[t+2];split.triangle(e,[o[r],o[r+1],o[r+2]],[o[a],o[a+1],o[a+2]],[o[s],o[s+1],o[s+2]],n)}},cube:(e,t,r,n,o,a,s,i)=>{const l=[o=o||0,a=a||0,s=s||0],f=[o+t,a,s],c=[o+t,a+r,s],h=[o,a+r,s],u=[o,a,s+n],d=[o+t,a,s+n],p=[o+t,a+r,s+n],g=[o,a+r,s+n];split.quad(e,f,l,h,c,i),split.quad(e,u,d,p,g,i),split.quad(e,l,f,d,u,i),split.quad(e,f,c,p,d,i),split.quad(e,c,h,g,p,i),split.quad(e,h,l,u,g,i)},cylinder:(e,t,r,n,o,a,s)=>{a=a||0;const i=split.NUM_X_SEGMENTS,l=2*Math.PI;let f,c,h,u,d,p;for(let g=0;g<i;g++)f=g/i*l,c=(g+1)/i*l,h=Math.sin(f),u=Math.cos(f),d=Math.sin(c),p=Math.cos(c),split.triangle(e,[t[0]+r*h,t[1]+r*u,a],[t[0]+n*d,t[1]+n*p,a+o],[t[0]+r*d,t[1]+r*p,a],s),0!==n&&split.triangle(e,[t[0]+n*h,t[1]+n*u,a+o],[t[0]+n*d,t[1]+n*p,a+o],[t[0]+r*h,t[1]+r*u,a],s)},dome:(e,t,r,n,o,a,s)=>{o=o||0;const i=split.NUM_Y_SEGMENTS/2,l=Math.PI/2,f=s?0:-l;let c,h,u,d,p,g,x,v,m,y;for(let s=0;s<i;s++)c=s/i*l+f,h=(s+1)/i*l+f,u=Math.cos(c),d=Math.sin(c),x=u*r,v=(p=Math.cos(h))*r,m=((g=Math.sin(h))-d)*n,y=o-g*n,split.cylinder(e,t,v,x,m,y,a)},sphere:(e,t,r,n,o,a)=>{o=o||0;let s=0;return s+=split.dome(e,t,r,n/2,o+n/2,a,!0),s+=split.dome(e,t,r,n/2,o+n/2,a)},pyramid:(e,t,r,n,o,a)=>{o=o||0;for(let s=0,i=(t=t[0]).length-1;s<i;s++)split.triangle(e,[t[s][0],t[s][1],o],[t[s+1][0],t[s+1][1],o],[r[0],r[1],o+n],a)},extrusion:(e,t,r,n,o,a)=>{n=n||0;let s,i,l,f,c,h,u,d,p,g,x,v,m=a[2]*r,y=a[3]*r;t.forEach(t=>{for(x=0,v=t.length-1;x<v;x++)s=t[x],i=t[x+1],l=vec2.len(vec2.sub(s,i)),f=[s[0],s[1],n],c=[i[0],i[1],n],h=[i[0],i[1],n+r],u=[s[0],s[1],n+r],d=vec3.normal(f,c,h),[].push.apply(e.vertices,[].concat(f,h,c,f,u,h)),[].push.apply(e.normals,[].concat(d,d,d,d,d,d)),[].push.apply(e.colors,[].concat(o,o,o,o,o,o)),p=a[0]*l<<0,g=a[1]*l<<0,e.texCoords.push(p,y,g,m,g,y,p,y,p,m,g,m)})}},vec3={len:e=>Math.sqrt(e[0]*e[0]+e[1]*e[1]+e[2]*e[2]),sub:(e,t)=>[e[0]-t[0],e[1]-t[1],e[2]-t[2]],unit:e=>{const t=vec3.len(e);return[e[0]/t,e[1]/t,e[2]/t]},normal:(e,t,r)=>{const n=vec3.sub(e,t),o=vec3.sub(t,r);return vec3.unit([n[1]*o[2]-n[2]*o[1],n[2]*o[0]-n[0]*o[2],n[0]*o[1]-n[1]*o[0]])}},vec2={len:e=>Math.sqrt(e[0]*e[0]+e[1]*e[1]),add:(e,t)=>[e[0]+t[0],e[1]+t[1]],sub:(e,t)=>[e[0]-t[0],e[1]-t[1]],dot:(e,t)=>e[1]*t[0]-e[0]*t[1],scale:(e,t)=>[e[0]*t,e[1]*t],equals:(e,t)=>e[0]===t[0]&&e[1]===t[1]};function getGeoJSONBounds(e){const t=e.type,r=e.coordinates,n=[1/0,1/0],o=[-1/0,-1/0];return"Polygon"===t&&r.length?(r[0].forEach(e=>{e[0]<n[0]&&(n[0]=e[0]),e[1]<n[1]&&(n[1]=e[1]),e[0]>o[0]&&(o[0]=e[0]),e[1]>o[1]&&(o[1]=e[1])}),{min:n,max:o}):"MultiPolygon"===t?(r.forEach(e=>{e[0]&&e[0].forEach(e=>{e[0]<n[0]&&(n[0]=e[0]),e[1]<n[1]&&(n[1]=e[1]),e[0]>o[0]&&(o[0]=e[0]),e[1]>o[1]&&(o[1]=e[1])})}),{min:n,max:o}):void 0}function getOBJBounds(e){const t=[1/0,1/0],r=[-1/0,-1/0];for(let n=0;n<e.length;n+=3)e[n]<t[0]&&(t[0]=e[0]),e[n+1]<t[1]&&(t[1]=e[n+1]),e[0]>r[0]&&(r[0]=e[0]),e[n+1]>r[1]&&(r[1]=e[n+1]);return t[0]*=METERS_PER_DEGREE_LATITUDE*Math.cos(t[1]/180*Math.PI),t[1]*=METERS_PER_DEGREE_LATITUDE,r[0]*=METERS_PER_DEGREE_LATITUDE*Math.cos(r[1]/180*Math.PI),r[1]*=METERS_PER_DEGREE_LATITUDE,{min:t,max:r}}const METERS_PER_DEGREE_LATITUDE=6378137*Math.PI/180;function getOrigin(e){const t=e.coordinates;switch(e.type){case"Point":return t;case"MultiPoint":case"LineString":return t[0];case"MultiLineString":case"Polygon":return t[0][0];case"MultiPolygon":return t[0][0][0]}}function getPickingColor(e){return[0,(255&++e)/255,(e>>8&255)/255]}function postResult(e,t,r){const n={items:e,position:t,vertices:new Float32Array(r.vertices),normals:new Float32Array(r.normals),colors:new Float32Array(r.colors),texCoords:new Float32Array(r.texCoords),heights:new Float32Array(r.heights),pickingColors:new Float32Array(r.pickingColors)};postMessage(n,[n.vertices.buffer,n.normals.buffer,n.colors.buffer,n.texCoords.buffer,n.heights.buffer,n.pickingColors.buffer])}function loadGeoJSON(e,t={}){"object"==typeof e?(postMessage("load"),processGeoJSON(e,t)):Request.getJSON(e,(e,r)=>{e?postMessage("error"):(postMessage("load"),processGeoJSON(r,t))})}function processGeoJSON(e,t){if(!e||!e.features.length)return void postMessage("error");const r={vertices:[],normals:[],colors:[],texCoords:[],heights:[],pickingColors:[]},n=[],o=getOrigin(e.features[0].geometry),a={latitude:o[1],longitude:o[0]};e.features.forEach((e,a)=>{const s=e.properties,i=t.id||e.id,l=getPickingColor(a);let f=r.vertices.length;triangulate(r,e,o),f=(r.vertices.length-f)/3;for(let e=0;e<f;e++)r.heights.push(s.height),r.pickingColors.push(...l);s.bounds=getGeoJSONBounds(e.geometry),n.push({id:i,properties:s,vertexCount:f})}),postResult(n,a,r)}function loadOBJ(e,t={}){Request.getText(e,(r,n)=>{if(r)return void postMessage("error");let o=n.match(/^mtllib\\s+(.*)$/m);o?Request.getText(e.replace(/[^\\/]+$/,"")+o[1],(e,r)=>{e?postMessage("error"):(postMessage("load"),processOBJ(n,r,t))}):(postMessage("load"),processOBJ(n,null,t))})}function processOBJ(e,t,r={}){const n={vertices:[],normals:[],colors:[],texCoords:[],heights:[],pickingColors:[]},o=[],a=Qolor.parse(r.color).toArray(),s=r.position;OBJ.parse(e,t,r.flipYZ).forEach((e,t)=>{n.vertices.push(...e.vertices),n.normals.push(...e.normals),n.texCoords.push(...e.texCoords);const s=r.id||e.id,i={},l=(s/2%2?-1:1)*(s%2?.03:.06),f=a||e.color||DEFAULT_COLOR,c=e.vertices.length/3,h=getPickingColor(t);for(let t=0;t<c;t++)n.colors.push(f[0]+l,f[1]+l,f[2]+l),n.heights.push(e.height),n.pickingColors.push(...h);i.height=e.height,i.color=e.color,i.bounds=getOBJBounds(e.vertices),o.push({id:s,properties:i,vertexCount:c})}),postResult(o,s,n)}onmessage=function(e){const t=e.data;"GeoJSON"===t.type&&loadGeoJSON(t.url,t.options),"OBJ"===t.type&&loadOBJ(t.url,t.options)};';
 
 
 
@@ -2344,8 +2305,8 @@ class OSMBuildings {
    * @param {Number} [options.rotation=0] Initial rotation
    * @param {Number} [options.tilt=0] Initial tilt
    * @param {Object} [options.position] Initial position
-   * @param {Number} [options.position.latitude=52.520000] position latitude
-   * @param {Number} [options.position.longitude=13.410000] Position longitude
+   * @param {Number} [options.position.latitude=49.0] position latitude
+   * @param {Number} [options.position.longitude=8.4] Position longitude
    * @param {String} [options.baseURL='.'] DEPRECATED For locating assets. This is relative to calling html page
    * @param {Boolean} [options.showBackfaces=false] DEPRECATED Render front and backsides of polygons. false increases performance, true might be needed for bad geometries
    * @param {String} [options.fogColor='#e8e0d8'] Color to be used for sky gradients, distance fog and color benath the map
@@ -2379,7 +2340,7 @@ class OSMBuildings {
 
     this.bounds = options.bounds;
 
-    this.position = options.position || { latitude: 52.520000, longitude: 13.410000 };
+    this.position = options.position || { latitude: 49.0, longitude: 8.4 };
     this.zoom = options.zoom || (this.minZoom + (this.maxZoom - this.minZoom) / 2);
     this.rotation = options.rotation || 0;
     this.tilt = options.tilt || 0;
@@ -2548,7 +2509,7 @@ class OSMBuildings {
    * Adds an 3d object (OBJ format) file to the map.
    * <em>Important</em> objects with exactly the same url are cached and only loaded once.
    * @example
-   * osmb.addOBJ(`${location.protocol}//${location.hostname}/${location.pathname}/Fernsehturm.obj`, { latitude:52.52000, longitude:13.41000 }, { id:'Fernsehturm', scale:1, color:'#ff0000', altitude:0, rotation:51 });
+   * osmb.addOBJ(`${location.protocol}//${location.hostname}/${location.pathname}/Fernsehturm.obj`, { latitude:49.0, longitude:8.4 }, { id:'Fernsehturm', scale:1, color:'#ff0000', altitude:0, rotation:51 });
    *
    * @param {String} url Absolute URL to OBJ file
    * @param {Object} position Where to render the object
