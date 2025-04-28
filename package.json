@@ -28,7 +28,7 @@
     "svg-path-contours": "^2.0.0"
   },
   "devDependencies": {
-    "documentation": "^5.3.0",
+    "documentation": "^14.0.3",
     "eslint": "^5.16.0",
     "uglify-es": "github:mishoo/UglifyJS2#harmony",
     "webpack": "^5.61.0",
